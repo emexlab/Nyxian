@@ -264,7 +264,7 @@
     NXWindow *window = self.windows[@(_activeWindowIdentifier)];
     if(window != nil &&
        _activeWindowIdentifier != window.identifier)
-       /&&
+       
        //[[UIDevice currentDevice] userInterfaceIdiom] != UIUserInterfaceIdiomPad)
     {
         // close first the old one and wait
