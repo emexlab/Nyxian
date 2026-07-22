@@ -43,12 +43,11 @@ jobs:
 
           
           mkdir -p CoreCompiler/CoreCompilerSupportLibs
-          mkdir -p Shared/SwiftToolchain
 
           
           RUN_ID=$(gh run list --repo "$GH_REPO" --status success --limit 1 --json databaseId -q '.[0].databaseId')
 
-          
+           
           gh run download "$RUN_ID" --repo "$GH_REPO" -n "CoreCompilerSupportLibs" --dir CoreCompiler/
           tar -xJ -f CoreCompiler/CoreCompilerSupportLibs.tar.xz -C CoreCompiler/ && rm CoreCompiler/CoreCompilerSupportLibs.tar.xz
 
@@ -57,7 +56,7 @@ jobs:
           tar -xJ -f CoreCompiler/CoreCompilerSupportLibs/LLVM.xcframework.tar.xz -C CoreCompiler/CoreCompilerSupportLibs/ && rm CoreCompiler/CoreCompilerSupportLibs/LLVM.xcframework.tar.xz
 
           
-          cp -a CoreCompiler/CoreCompilerSupportLibs/. Shared/SwiftToolchain/
+          rm -rf Shared/SwiftToolchain
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
