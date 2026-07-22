@@ -113,9 +113,7 @@ CoreCompiler/CoreCompilerSupportLibs:
 	@if [ -d "Shared/SwiftToolchain" ]; then \
 		cp -a Shared/SwiftToolchain/* CoreCompiler/CoreCompilerSupportLibs/ 2>/dev/null || true; \
 	fi
-	@if [ -d "LLVM.xcframework" ]; then \
-		cp -a LLVM.xcframework CoreCompiler/CoreCompilerSupportLibs/ 2>/dev/null || true; \
-	fi
+	
 
 
 # Helper
