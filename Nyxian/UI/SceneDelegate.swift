@@ -138,23 +138,27 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate, UITabBarControllerDeleg
 
         let contentViewController: ContentViewController = ContentViewController()
         let settingsViewController: SettingsViewController = SettingsViewController()
+        let appsViewController: ApplicationManagementViewController = ApplicationManagementViewController.shared
         
         let contentNavigationController: UINavigationController = UINavigationController(rootViewController: contentViewController)
         let settingsNavigationController: UINavigationController = UINavigationController(rootViewController: settingsViewController)
-        var viewControllers: [UIViewController] = [contentNavigationController, settingsNavigationController] 
+        let appsNavigationController: UINavigationController = UINavigationController(rootViewController: appsViewController)
+        var viewControllers: [UIViewController] = [contentNavigationController, settingsNavigationController, appsNavigationController] 
         contentNavigationController.tabBarItem = UITabBarItem(title: "Projects", image: UIImage(systemName: "square.grid.2x2.fill"), tag: 0)
         settingsNavigationController.tabBarItem = UITabBarItem(title: "Settings", image: UIImage(systemName: "gear"), tag: 1)
-        
+        appsNavigationController.tabBarItem = UITabBarItem(title: "Apps", image: UIImage(systemName: "app.badge"), tag: 2) 
+
+
         
         
         //if UIDevice.current.userInterfaceIdiom == .phone {
-            if #available(iOS 26.0, *) {
-                let fakeViewController: UIViewController = UIViewController()
-                fakeViewController.tabBarItem = UITabBarItem(tabBarSystemItem: .search, tag: 2)
-                fakeViewController.tabBarItem.title = "Switcher"
-                fakeViewController.tabBarItem.image = UIImage(systemName: "iphone.app.switcher")
-                viewControllers.append(fakeViewController)
-            }
+            //if #available(iOS 26.0, *) {
+                //let fakeViewController: UIViewController = UIViewController()
+                //fakeViewController.tabBarItem = UITabBarItem(tabBarSystemItem: .search, tag: 2)
+                //fakeViewController.tabBarItem.title = "Switcher"
+                //fakeViewController.tabBarItem.image = UIImage(systemName: "iphone.app.switcher")
+                //viewControllers.append(fakeViewController)
+            //}
         //}
         
         themedTabViewController.viewControllers = viewControllers
@@ -186,10 +190,10 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate, UITabBarControllerDeleg
         if tabBarController.selectedViewController === viewController && Builder.builds {
             return false
         }
-        if viewController.tabBarItem.tag == 2 {
-            self.window?.showAppSwitcherExternal()
-            return false
-        }
+        //if viewController.tabBarItem.tag == 2 {
+            //self.window?.showAppSwitcherExternal()
+            //return false
+        //}
         return true
     }
     
