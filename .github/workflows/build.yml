@@ -45,7 +45,7 @@ jobs:
         run: |
           set -e
 
-          CHECK_DEPS=0 make all
+          CHECK_DEPS=0 make all ARCHS="arm64" ONLY_ACTIVE_ARCH=YES SDKROOT=iphoneos
 
       - name: Upload Nyxian
         uses: actions/upload-artifact@v4
