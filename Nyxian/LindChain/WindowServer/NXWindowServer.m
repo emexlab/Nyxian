@@ -63,7 +63,8 @@
         _activeWindowIdentifier = (id_t)-1;
         _appSwitcherView = nil;
         
-        if(UIDevice.currentDevice.userInterfaceIdiom == UIUserInterfaceIdiomPad)
+        //if(UIDevice.currentDevice.userInterfaceIdiom == UIUserInterfaceIdiomPad)
+        if(YES)
         {
             [[UIDevice currentDevice] beginGeneratingDeviceOrientationNotifications];
             [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(orientationChanged:) name:UIDeviceOrientationDidChangeNotification object:nil];
@@ -200,7 +201,8 @@
 
 - (void)windowsGetOutOfMyWay
 {
-    if(UIDevice.currentDevice.userInterfaceIdiom != UIUserInterfaceIdiomPad)
+    //if(UIDevice.currentDevice.userInterfaceIdiom != UIUserInterfaceIdiomPad)
+    if(YES)
     {
         return;
     }
@@ -212,7 +214,8 @@
 
 - (void)windowsGetInMyWay
 {
-    if(UIDevice.currentDevice.userInterfaceIdiom != UIUserInterfaceIdiomPad)
+    //if(UIDevice.currentDevice.userInterfaceIdiom != UIUserInterfaceIdiomPad)
+    if(YES)
     {
         return;
     }
@@ -260,8 +263,9 @@
     
     NXWindow *window = self.windows[@(_activeWindowIdentifier)];
     if(window != nil &&
-       _activeWindowIdentifier != window.identifier &&
-       [[UIDevice currentDevice] userInterfaceIdiom] != UIUserInterfaceIdiomPad)
+       _activeWindowIdentifier != window.identifier)
+       /&&
+       //[[UIDevice currentDevice] userInterfaceIdiom] != UIUserInterfaceIdiomPad)
     {
         // close first the old one and wait
         [self deactivateWindowByPullDown:YES withIdentifier:_activeWindowIdentifier withCompletion:^{
@@ -314,18 +318,18 @@
     [self bringSubviewToFront:_windowLayer];
     [_windowLayer setUserInteractionEnabled:YES];
 
-    if(UIDevice.currentDevice.userInterfaceIdiom == UIUserInterfaceIdiomPhone)
-    {
+    //if(UIDevice.currentDevice.userInterfaceIdiom == UIUserInterfaceIdiomPhone)
+    //{
         /* iOS 26 and above uses the tabbar button instead of gesture */
-        if(@available(iOS 26.0, *))
-        {
-            return;
-        }
+        //if(@available(iOS 26.0, *))
+        //{
+            //return;
+        //}
             
         /* add the gesture */
-        UILongPressGestureRecognizer *gestureRecognizer = [[UILongPressGestureRecognizer alloc] initWithTarget:self action:@selector(handleLongPress:)];
-        [self addGestureRecognizer:gestureRecognizer];
-    }
+        //UILongPressGestureRecognizer *gestureRecognizer = [[UILongPressGestureRecognizer alloc] initWithTarget:self action:@selector(handleLongPress:)];
+        //[self addGestureRecognizer:gestureRecognizer];
+    //}
 }
 
 // TODO: FRIDA! PLS MAKE LDEWINDOWSERVERTILEVIEW!!!! IM SO LAZY ONG
@@ -886,7 +890,8 @@
     /* checking if maximised */
     if(window.isMaximized)
     {
-        if([[UIDevice currentDevice] userInterfaceIdiom] == UIUserInterfaceIdiomPad)
+        //if([[UIDevice currentDevice] userInterfaceIdiom] == UIUserInterfaceIdiomPad)
+        if(YES)
         {
             return self.bounds;
         }
