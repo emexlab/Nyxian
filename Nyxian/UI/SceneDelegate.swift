@@ -145,7 +145,7 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate, UITabBarControllerDeleg
         
         var viewControllers: [UIViewController] = [contentNavigationController, settingsNavigationController]
         
-        if UIDevice.current.userInterfaceIdiom == .phone {
+        //if UIDevice.current.userInterfaceIdiom == .phone {
             if #available(iOS 26.0, *) {
                 let fakeViewController: UIViewController = UIViewController()
                 fakeViewController.tabBarItem = UITabBarItem(tabBarSystemItem: .search, tag: 2)
@@ -153,7 +153,7 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate, UITabBarControllerDeleg
                 fakeViewController.tabBarItem.image = UIImage(systemName: "iphone.app.switcher")
                 viewControllers.append(fakeViewController)
             }
-        }
+        //}
         
         themedTabViewController.viewControllers = viewControllers
         themedTabViewController.delegate = self
