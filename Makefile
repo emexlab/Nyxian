@@ -106,11 +106,11 @@ all: SCHEME := Nyxian
 all: FILE := emexDE.ipa
 all: clean check compile package-app clean
 
-# Dependencies
+
 CoreCompiler/CoreCompilerSupportLibs:
-	mkdir -p CoreCompiler/CoreCompilerSupportLibs 
-    cp -r Shared/SwiftToolchain/* CoreCompiler/CoreCompilerSupportLibs/ 2>/dev/null || true 
-    cp -r LLVM.xcframework CoreCompiler/CoreCompilerSupportLibs/ 2>/dev/null || true
+	mkdir -p CoreCompiler/CoreCompilerSupportLibs
+	cp -r Shared/SwiftToolchain/* CoreCompiler/CoreCompilerSupportLibs/ 2>/dev/null || true
+	cp -r LLVM.xcframework CoreCompiler/CoreCompilerSupportLibs/ 2>/dev/null || true
 
 # Helper
 update-config:
