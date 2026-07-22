@@ -885,7 +885,7 @@
     /* calculating fullscreen rectangle */
     CGRect allowed = UIEdgeInsetsInsetRect(bounds, insets);
     CGRect boundsInset = allowed;
-    allowed.size.height += insets.bottom;
+    //allowed.size.height += insets.bottom;
     
     /* checking if maximised */
     if(window.isMaximized)
@@ -893,10 +893,10 @@
         //if([[UIDevice currentDevice] userInterfaceIdiom] == UIUserInterfaceIdiomPad)
         if(YES)
         {
-            return self.bounds;
-        }
-        else
-        {
+            //return self.bounds;
+        //}
+        //else
+        //{
             return allowed;
         }
     }
