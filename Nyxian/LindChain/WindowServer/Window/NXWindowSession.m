@@ -26,40 +26,15 @@
 
 - (BOOL)openWindow
 {
-    
-    CGRect screenBounds = [UIScreen mainScreen].bounds;
-    UIEdgeInsets safeAreaInsets = UIEdgeInsetsZero;
-
-    if (self.windowScene) {
-        screenBounds = self.windowScene.coordinateSpace.bounds;
-        
-        
-        UIWindow *keyWindow = nil;
-        for (UIWindow *window in self.windowScene.windows) {
-            if (window.isKeyWindow) {
-                keyWindow = window;
-                break;
-            }
-        }
-        if (keyWindow) {
-            safeAreaInsets = keyWindow.safeAreaInsets;
-        }
+    if (!self.windowScene) {
+        return NO;
     }
-    
-    
-    CGRect safeBounds = CGRectMake(
-        screenBounds.origin.x + safeAreaInsets.left,
-        screenBounds.origin.y + safeAreaInsets.top,
-        screenBounds.size.width - safeAreaInsets.left - safeAreaInsets.right,
-        screenBounds.size.height - safeAreaInsets.top - safeAreaInsets.bottom
-    );
-    
-   
-    _startWindowRect = safeBounds;
-    
-    return (self.windowScene != nil);
+    if (!self.isMaximized) {
+        [self maximizeWindow:NO];
+    }
+    _startWindowRect = [self.delegate window:self wantsToChangeToRect:CGRectZero];
+    return YES;
 }
-
 
 - (BOOL)closeWindow
 {
