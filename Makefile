@@ -108,10 +108,9 @@ all: clean check compile package-app clean
 
 # Dependencies
 CoreCompiler/CoreCompilerSupportLibs:
-	cd LLVM-On-iOS; $(MAKE)
-	rm -rf CoreCompiler/CoreCompilerSupportLibs
-	cp -r LLVM-On-iOS/CoreCompilerSupportLibs CoreCompiler/CoreCompilerSupportLibs
-	cp -r LLVM-On-iOS/LLVM.xcframework CoreCompiler/CoreCompilerSupportLibs/LLVM.xcframework
+	mkdir -p CoreCompiler/CoreCompilerSupportLibs 
+    cp -r Shared/SwiftToolchain/* CoreCompiler/CoreCompilerSupportLibs/ 2>/dev/null || true 
+    cp -r LLVM.xcframework CoreCompiler/CoreCompilerSupportLibs/ 2>/dev/null || true
 
 # Helper
 update-config:
