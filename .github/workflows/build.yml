@@ -36,31 +36,30 @@ jobs:
           # Packages we desperately need
           brew install ldid dpkg libarchive
 
-            - name: Setup
-         run: |
-           set -e
-           GH_REPO="ruri1208/LLVM-On-iOS"
-
-         
-           mkdir -p Shared/SwiftToolchain
-           mkdir -p CoreCompiler/CoreCompilerSupportLibs
+      - name: Setup LLVM Toolchain
+        run: |
+          set -e
+          GH_REPO="ruri1208/LLVM-On-iOS"
 
           
-           RUN_ID=$(gh run list --repo "$GH_REPO" --status success --limit 1 --json databaseId -q '.[0].databaseId')
-
-         
-           gh run download "$RUN_ID" --repo "$GH_REPO" -n "LLVM.xcframework" --dir .
-           tar -xJ -f LLVM.xcframework.tar.xz -C . && rm LLVM.xcframework.tar.xz
+          mkdir -p Shared/SwiftToolchain
+          mkdir -p CoreCompiler/CoreCompilerSupportLibs
 
           
-           gh run download "$RUN_ID" --repo "$GH_REPO" -n "CoreCompilerSupportLibs" --dir CoreCompiler/
-           tar -xJ -f CoreCompiler/CoreCompilerSupportLibs.tar.xz -C CoreCompiler/ && rm CoreCompiler/CoreCompilerSupportLibs.tar.xz
-          
-          
-           cp -a CoreCompiler/CoreCompilerSupportLibs/. Shared/SwiftToolchain/
-         env:
-           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RUN_ID=$(gh run list --repo "$GH_REPO" --status success --limit 1 --json databaseId -q '.[0].databaseId')
 
+          
+          gh run download "$RUN_ID" --repo "$GH_REPO" -n "LLVM.xcframework" --dir .
+          tar -xJ -f LLVM.xcframework.tar.xz -C . && rm LLVM.xcframework.tar.xz
+
+          
+          gh run download "$RUN_ID" --repo "$GH_REPO" -n "CoreCompilerSupportLibs" --dir CoreCompiler/
+          tar -xJ -f CoreCompiler/CoreCompilerSupportLibs.tar.xz -C CoreCompiler/ && rm CoreCompiler/CoreCompilerSupportLibs.tar.xz
+
+          
+          cp -a CoreCompiler/CoreCompilerSupportLibs/. Shared/SwiftToolchain/
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Build Nyxian
         timeout-minutes: 1200
