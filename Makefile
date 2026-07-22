@@ -128,6 +128,8 @@ compile: CoreCompiler/CoreCompilerSupportLibs
 		-configuration Release \
 		-destination 'generic/platform=iOS' \
 		-archivePath build/Nyxian.xcarchive \
+        ARCHS="arm64" \
+		ONLY_ACTIVE_ARCH=YES \
 		archive \
 		CODE_SIGN_IDENTITY="" \
 		CODE_SIGNING_REQUIRED=NO \
