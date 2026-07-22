@@ -133,7 +133,7 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate, UITabBarControllerDeleg
         NXBootstrap.shared().bootstrap()
 
         let themedTabViewController: UIThemedTabViewController = UIThemedTabViewController()
-        var viewControllers: [UIViewController] = [contentNavigationController, settingsNavigationController]
+        
         if #available(iOS 26.0, *) {
             let appViewController: UIViewController = UINavigationController(rootViewController: ApplicationManagementViewController.shared) 
             appViewController.tabBarItem = UITabBarItem(tabBarSystemItem: .search, tag: 0)
@@ -147,11 +147,17 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate, UITabBarControllerDeleg
         
         let contentNavigationController: UINavigationController = UINavigationController(rootViewController: contentViewController)
         let settingsNavigationController: UINavigationController = UINavigationController(rootViewController: settingsViewController)
-        
+        var viewControllers: [UIViewController] = [contentNavigationController, settingsNavigationController] 
         contentNavigationController.tabBarItem = UITabBarItem(title: "Projects", image: UIImage(systemName: "square.grid.2x2.fill"), tag: 1)
         settingsNavigationController.tabBarItem = UITabBarItem(title: "Settings", image: UIImage(systemName: "gear"), tag: 2)
         
-        
+        if #available(iOS 26.0, *) {
+            let appViewController: UIViewController = UINavigationController(rootViewController: ApplicationManagementViewController.shared) 
+            appViewController.tabBarItem = UITabBarItem(tabBarSystemItem: .search, tag: 0)
+            appViewController.tabBarItem.title = "App"
+            appViewController.tabBarItem.image = UIImage(systemName: "app.badge")
+            viewControllers.append(appViewController)
+        }
         
         //if UIDevice.current.userInterfaceIdiom == .phone {
             if #available(iOS 26.0, *) {
