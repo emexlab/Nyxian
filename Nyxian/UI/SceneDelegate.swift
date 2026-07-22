@@ -135,7 +135,7 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate, UITabBarControllerDeleg
         let themedTabViewController: UIThemedTabViewController = UIThemedTabViewController()
      
         if #available(iOS 26.0, *) {
-            let appViewController: UIViewController = ApplicationManagementViewController.shared
+            let appViewController: UIViewController = UINavigationController(rootViewController: ApplicationManagementViewController.shared) 
             appViewController.tabBarItem = UITabBarItem(tabBarSystemItem: .search, tag: 0)
             appViewController.tabBarItem.title = "App"
             appViewController.tabBarItem.image = UIImage(systemName: "app.badge")
