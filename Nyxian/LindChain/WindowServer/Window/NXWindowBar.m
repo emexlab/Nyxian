@@ -373,7 +373,7 @@
         //CGFloat safeTop = self.window.safeAreaInsets.top;
         CGFloat baseHeight = 44.0;
         
-        CGFloat newHeight = baseHeight
+        CGFloat newHeight = baseHeight;
         
         void (^changes)(void) = ^{
             self->_windowBarHeightConstraint.constant = newHeight;
