@@ -131,24 +131,32 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate, UITabBarControllerDeleg
         }
         
         NXBootstrap.shared().bootstrap()
-        
+
         let themedTabViewController: UIThemedTabViewController = UIThemedTabViewController()
-        
+     
+        if #available(iOS 26.0, *) {
+            let appViewController: UIViewController = ApplicationManagementViewController.shared
+            appViewController.tabBarItem = UITabBarItem(tabBarSystemItem: .search, tag: 0)
+            appViewController.tabBarItem.title = "App"
+            appViewController.tabBarItem.image = UIImage(systemName: "app.badge")
+            viewControllers.append(appViewController)
+        }
+
         let contentViewController: ContentViewController = ContentViewController()
         let settingsViewController: SettingsViewController = SettingsViewController()
         
         let contentNavigationController: UINavigationController = UINavigationController(rootViewController: contentViewController)
         let settingsNavigationController: UINavigationController = UINavigationController(rootViewController: settingsViewController)
         
-        contentNavigationController.tabBarItem = UITabBarItem(title: "Projects", image: UIImage(systemName: "square.grid.2x2.fill"), tag: 0)
-        settingsNavigationController.tabBarItem = UITabBarItem(title: "Settings", image: UIImage(systemName: "gear"), tag: 1)
+        contentNavigationController.tabBarItem = UITabBarItem(title: "Projects", image: UIImage(systemName: "square.grid.2x2.fill"), tag: 1)
+        settingsNavigationController.tabBarItem = UITabBarItem(title: "Settings", image: UIImage(systemName: "gear"), tag: 2)
         
         var viewControllers: [UIViewController] = [contentNavigationController, settingsNavigationController]
         
         //if UIDevice.current.userInterfaceIdiom == .phone {
             if #available(iOS 26.0, *) {
                 let fakeViewController: UIViewController = UIViewController()
-                fakeViewController.tabBarItem = UITabBarItem(tabBarSystemItem: .search, tag: 2)
+                fakeViewController.tabBarItem = UITabBarItem(tabBarSystemItem: .search, tag: 3)
                 fakeViewController.tabBarItem.title = "Switcher"
                 fakeViewController.tabBarItem.image = UIImage(systemName: "iphone.app.switcher")
                 viewControllers.append(fakeViewController)
@@ -184,7 +192,7 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate, UITabBarControllerDeleg
         if tabBarController.selectedViewController === viewController && Builder.builds {
             return false
         }
-        if viewController.tabBarItem.tag == 2 {
+        if viewController.tabBarItem.tag == 3 {
             self.window?.showAppSwitcherExternal()
             return false
         }
