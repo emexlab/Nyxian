@@ -39,6 +39,23 @@ jobs:
       - name: Setup
         run: |
           set -e
+          
+          GH_REPO="ruri1208/LLVM-On-iOS"
+
+          mkdir -p Shared/SwiftToolchain
+
+         
+          RUN_ID=$(gh run list --repo "$GH_REPO" --status success --limit 1 --json databaseId -q '.[0].databaseId')
+
+          
+          gh run download "$RUN_ID" --repo "$GH_REPO" -n "LLVM.xcframework" --dir .
+          tar -xJ -f LLVM.xcframework.tar.xz -C . && rm LLVM.xcframework.tar.xz
+
+          
+          gh run download "$RUN_ID" --repo "$GH_REPO" -n "CoreCompilerSupportLibs" --dir Shared/SwiftToolchain/
+          tar -xJ -f Shared/SwiftToolchain/CoreCompilerSupportLibs.tar.xz -C Shared/SwiftToolchain/ && rm Shared/SwiftToolchain/CoreCompilerSupportLibs.tar.xz
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Build Nyxian
         timeout-minutes: 1200
