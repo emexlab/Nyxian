@@ -52,10 +52,10 @@ class SettingsViewController: UIThemedTableViewController {
             cell.imageView?.image = UIImage(systemName: "wrench.adjustable.fill")
             cell.textLabel?.text = "Toolchain"
             break
-        case 1:
-            cell.imageView?.image = UIImage(systemName: "app.badge.fill")
-            cell.textLabel?.text = "Applications"
-            break
+        //case 1:
+            //cell.imageView?.image = UIImage(systemName: "app.badge.fill")
+            //cell.textLabel?.text = "Applications"
+            //break
         case 2:
             cell.imageView?.image = UIImage(systemName: "paintbrush.fill")
             cell.textLabel?.text = "Customization"
@@ -96,8 +96,8 @@ class SettingsViewController: UIThemedTableViewController {
             switch index {
             case 0:
                 return ToolChainController(style: .insetGrouped)
-            case 1:
-                return ApplicationManagementViewController.shared
+            //case 1:
+                //return ApplicationManagementViewController.shared
             case 2:
                 return CustomizationViewController(style: .insetGrouped)
             case 3:
