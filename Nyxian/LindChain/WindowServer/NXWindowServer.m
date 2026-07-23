@@ -346,6 +346,28 @@
         [self showAppSwitcher];
     }
 }
+- (CGFloat)currentAppSwitcherHeightMultiplier
+{
+    
+    BOOL isLandscape = [UIApplication sharedApplication].statusBarOrientation == UIInterfaceOrientationLandscapeLeft ||
+                        [UIApplication sharedApplication].statusBarOrientation == UIInterfaceOrientationLandscapeRight;
+    return isLandscape ? 0.95 : 0.55;
+}
+- (void)viewWillTransitionToSize:(CGSize)size withTransitionCoordinator:(id<UIViewControllerTransitionCoordinator>)coordinator
+{
+    [super viewWillTransitionToSize:size withTransitionCoordinator:coordinator];
+    
+    [coordinator animateAlongsideTransition:^(id<UIViewControllerTransitionCoordinatorContext> context) {
+        
+        if (self.appSwitcherHeightConstraint) {
+            self.appSwitcherHeightConstraint.active = NO;
+            CGFloat multiplier = (size.width > size.height) ? 0.95 : 0.55;
+            self.appSwitcherHeightConstraint = [self.appSwitcherView.heightAnchor constraintEqualToAnchor:self.rootViewController.view.heightAnchor multiplier:multiplier];
+            self.appSwitcherHeightConstraint.active = YES;
+        }
+        [self.rootViewController.view layoutIfNeeded];
+    } completion:nil];
+}
 
 - (void)buildAppSwitcherView
 {
@@ -385,9 +407,11 @@
     
     [self buildPlaceholderStackInView:effectView.contentView];
     
+    UILayoutGuide *contentSafeGuide = effectView.contentView.safeAreaLayoutGuide;
+    
     [NSLayoutConstraint activateConstraints:@[
-        [_runningAppsScrollView.topAnchor constraintEqualToAnchor:effectView.topAnchor constant:20],
-        [_runningAppsScrollView.bottomAnchor constraintEqualToAnchor:effectView.contentView.bottomAnchor constant:-20],
+        [_runningAppsScrollView.topAnchor constraintEqualToAnchor:effectView.contentView.topAnchor constant:20],
+        [_runningAppsScrollView.bottomAnchor constraintEqualToAnchor:contentSafeGuide.bottomAnchor constant:-20],
         [_runningAppsScrollView.leadingAnchor constraintEqualToAnchor:effectView.contentView.leadingAnchor],
         [_runningAppsScrollView.trailingAnchor constraintEqualToAnchor:effectView.contentView.trailingAnchor],
         
@@ -405,11 +429,16 @@
     self.appSwitcherView = container;
     [self.rootViewController.view addSubview:self.appSwitcherView];
     
+    UILayoutGuide *rootSafeGuide = self.rootViewController.view.safeAreaLayoutGuide;
+    
     [NSLayoutConstraint activateConstraints:@[
-        [self.appSwitcherView.leadingAnchor constraintEqualToAnchor:self.rootViewController.view.leadingAnchor],
-        [self.appSwitcherView.trailingAnchor constraintEqualToAnchor:self.rootViewController.view.trailingAnchor],
-        [self.appSwitcherView.heightAnchor constraintEqualToAnchor:self.rootViewController.view.heightAnchor multiplier:0.55]
+        [self.appSwitcherView.leadingAnchor constraintEqualToAnchor:rootSafeGuide.leadingAnchor constant:12],
+        [self.appSwitcherView.trailingAnchor constraintEqualToAnchor:rootSafeGuide.trailingAnchor constant:-12]
     ]];
+    
+    CGFloat heightMultiplier = [self currentAppSwitcherHeightMultiplier];
+    self.appSwitcherHeightConstraint = [self.appSwitcherView.heightAnchor constraintEqualToAnchor:self.rootViewController.view.heightAnchor multiplier:heightMultiplier];
+    self.appSwitcherHeightConstraint.active = YES;
     
     self.appSwitcherTopConstraint = [self.appSwitcherView.topAnchor constraintEqualToAnchor:self.rootViewController.view.bottomAnchor];
     self.appSwitcherTopConstraint.active = YES;
@@ -422,6 +451,7 @@
     self.impactGenerator = [[UIImpactFeedbackGenerator alloc] initWithStyle:UIImpactFeedbackStyleMedium];
     [self.impactGenerator prepare];
 }
+
 
 - (UIVisualEffectView *)createBlurEffectView
 {
