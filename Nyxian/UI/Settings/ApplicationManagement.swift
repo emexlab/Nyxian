@@ -192,7 +192,7 @@ class ApplicationManagementViewController: UIThemedTableViewController, UITextFi
         super.viewDidLoad()
         self.tableView.register(ProjectTableCell.self, forCellReuseIdentifier: ProjectTableCell.reuseIdentifier)
         LDEApplicationWorkspace.shared().ping()
-        self.title = "Applications"
+        self.title = "Apps"
         self.navigationItem.rightBarButtonItem = UIBarButtonItem(title: nil, image: UIImage(systemName: "square.and.arrow.down.fill"), target: self, action: #selector(plusButtonPressed))
     }
     
