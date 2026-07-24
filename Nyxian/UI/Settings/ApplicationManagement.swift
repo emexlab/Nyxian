@@ -211,16 +211,13 @@ class ApplicationManagementViewController: UIThemedTableViewController, UITextFi
     }
 
     @objc private func toggleMultitasking() {
-    
         let currentState = NXWindowServer.isMultitaskingEnabled()
         let newState = !currentState
-    
-    
-    //NXWindowServer.setMultitaskingEnabled(newState)
-    
-   
+        UserDefaults.standard.set(newState, forKey: "LCMultitaskingEnabled")
+        NXWindowServer.setMultitaskingEnabled(newState)
         updateMultitaskingButton()
     }
+
     override func viewDidAppear(_ animated: Bool) {
         super.viewDidAppear(animated)
     }
