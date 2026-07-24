@@ -132,10 +132,9 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate, UITabBarControllerDeleg
         
         NXBootstrap.shared().bootstrap()
 
-        let themedTabViewController: UIThemedTabViewController = UIThemedTabViewController()
-        
-        
-
+        //let themedTabViewController: UIThemedTabViewController = UIThemedTabViewController()
+        let themedTabViewController = UIThemedTabViewController() 
+        self.themedTabViewController = themedTabViewController
         let contentViewController: ContentViewController = ContentViewController()
         let settingsViewController: SettingsViewController = SettingsViewController()
         let appsViewController: ApplicationManagementViewController = ApplicationManagementViewController.shared
