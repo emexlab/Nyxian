@@ -418,11 +418,19 @@
     
     self.appSwitcherView = container;
     [self.rootViewController.view addSubview:self.appSwitcherView];
-    
+    BOOL isIPad = (UIDevice.currentDevice.userInterfaceIdiom  UIUserInterfaceIdiomPad);
+    UIInterfaceOrientation orientation = [UIApplication sharedApplication].windows.firstObject.windowScene.interfaceOrientation; 
+    BOOL isLandscape = UIInterfaceOrientationIsLandscape(orientation);
+    CGFloat heightMultiplier; 
+    if (isIPad) { 
+        heightMultiplier = isLandscape ? 0.50 : 0.25; 
+    } else { 
+        heightMultiplier = isLandscape ? 0.75 : 0.50; 
+    }
     [NSLayoutConstraint activateConstraints:@[
         [self.appSwitcherView.leadingAnchor constraintEqualToAnchor:self.rootViewController.view.leadingAnchor],
         [self.appSwitcherView.trailingAnchor constraintEqualToAnchor:self.rootViewController.view.trailingAnchor],
-        [self.appSwitcherView.heightAnchor constraintEqualToAnchor:self.rootViewController.view.heightAnchor multiplier:0.55]
+        [self.appSwitcherView.heightAnchor constraintEqualToAnchor:self.rootViewController.view.heightAnchor multiplier:heightMultiplier]
     ]];
     
     self.appSwitcherTopConstraint = [self.appSwitcherView.topAnchor constraintEqualToAnchor:self.rootViewController.view.bottomAnchor];
@@ -963,6 +971,11 @@
             {
                 [window changeWindowToRect:[self window:window wantsToChangeToRect:window.view.frame] completion:nil];
             }
+        }
+        if (self.appSwitcherView && self.appSwitcherView.superview) {
+        [self.appSwitcherView removeFromSuperview];
+        self.appSwitcherView = nil;
+        [self buildAppSwitcherView]; 
         }
     });
 }
