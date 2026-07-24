@@ -84,6 +84,17 @@
 {
     [super layoutSubviews];
     _windowLayer.frame = self.bounds;
+    if (self.appSwitcherView && _appSwitcherHeightConstraint) { 
+        BOOL isIPad = (UIDevice.currentDevice.userInterfaceIdiom == UIUserInterfaceIdiomPad); 
+        UIInterfaceOrientation orientation = self.windowScene.interfaceOrientation; 
+        BOOL isLandscape = UIInterfaceOrientationIsLandscape(orientation);  
+        CGFloat newMultiplier = isIPad ? (isLandscape ? 0.50 : 0.25) : (isLandscape ? 0.75 : 0.50);
+        if (fabs(_appSwitcherHeightConstraint.multiplier - newMultiplier) > 0.01) {
+            _appSwitcherHeightConstraint.active = NO;
+            _appSwitcherHeightConstraint = [self.appSwitcherView.heightAnchor constraintEqualToAnchor:self.rootViewController.view.heightAnchor multiplier:newMultiplier];
+            _appSwitcherHeightConstraint.active = YES;
+        }
+    }
 }
 
 + (instancetype)sharedWithWindowScene:(UIWindowScene*)windowScene
@@ -970,11 +981,7 @@
                 [window changeWindowToRect:[self window:window wantsToChangeToRect:window.view.frame] completion:nil];
             }
         }
-        if (self.appSwitcherView && self.appSwitcherView.superview) {
-        [self.appSwitcherView removeFromSuperview];
-        self.appSwitcherView = nil;
-        [self buildAppSwitcherView]; 
-        }
+        [self layoutIfNeeded];
     });
 }
 
