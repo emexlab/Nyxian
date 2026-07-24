@@ -20,7 +20,7 @@
 */
 
 #import <LindChain/WindowServer/Window/NXWindowBar.h>
-
+#import <LindChain/WindowServer/NXWindowServer.h>
 @implementation NXWindowBar {
     UIView *_bottomBorder;
 
@@ -94,7 +94,7 @@
     _windowBarHeightConstraint.active = YES;
 
     //if([[UIDevice currentDevice] userInterfaceIdiom] == UIUserInterfaceIdiomPad)
-    if(YES)
+    if([NXWindowServer isMultitaskingEnabled])
     {
         [_titleLabel.centerYAnchor constraintEqualToAnchor:self.bottomAnchor constant:-19.0].active = YES;
     }
