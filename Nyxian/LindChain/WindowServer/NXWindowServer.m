@@ -103,6 +103,14 @@
 {
     return [self sharedWithWindowScene:nil];
 }
++ (BOOL)isMultitaskingEnabled
+{
+    NSUserDefaults *defaults = [NSUserDefaults standardUserDefaults];
+    if ([defaults objectForKey:@"EnableMultitasking"] == nil) {
+        return YES;
+    }
+    return [defaults boolForKey:@"EnableMultitasking"];
+}
 
 - (void)moveWindowToFrontWithNumber:(NSNumber *)number
 {
@@ -202,7 +210,7 @@
 - (void)windowsGetOutOfMyWay
 {
     //if(UIDevice.currentDevice.userInterfaceIdiom != UIUserInterfaceIdiomPad)
-    if(YES)
+    if(![NXWindowServer isMultitaskingEnabled])
     {
         return;
     }
@@ -215,7 +223,7 @@
 - (void)windowsGetInMyWay
 {
     //if(UIDevice.currentDevice.userInterfaceIdiom != UIUserInterfaceIdiomPad)
-    if(YES)
+    if(![NXWindowServer isMultitaskingEnabled])
     {
         return;
     }
@@ -263,7 +271,7 @@
     
     NXWindow *window = self.windows[@(_activeWindowIdentifier)];
     if(window != nil &&
-       _activeWindowIdentifier != window.identifier)
+       _activeWindowIdentifier != window.identifier && ![NXWindowServer isMultitaskingEnabled])
        
        //[[UIDevice currentDevice] userInterfaceIdiom] != UIUserInterfaceIdiomPad)
     {
