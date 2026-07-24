@@ -111,9 +111,6 @@
     }
     return [defaults boolForKey:@"MultitaskingEnabled"];
 }
-+ (BOOL)isMultitaskingEnabled {
-    return [[NSUserDefaults standardUserDefaults] boolForKey:@"MultitaskingEnabled"];
-}
 
 + (void)setMultitaskingEnabled:(BOOL)enabled {
     [[NSUserDefaults standardUserDefaults] setBool:enabled forKey:@"MultitaskingEnabled"];
