@@ -436,11 +436,12 @@
     UIInterfaceOrientation orientation = [UIApplication sharedApplication].windows.firstObject.windowScene.interfaceOrientation;  
     BOOL isLandscape = UIInterfaceOrientationIsLandscape(orientation); 
     CGFloat heightMultiplier = isIPad ? (isLandscape ? 0.50 : 0.25) : (isLandscape ? 0.75 : 0.50);
-   
+    _appSwitcherHeightConstraint = [self.appSwitcherView.heightAnchor constraintEqualToAnchor:self.rootViewController.view.heightAnchor multiplier:heightMultiplier];
     [NSLayoutConstraint activateConstraints:@[
         [self.appSwitcherView.leadingAnchor constraintEqualToAnchor:self.rootViewController.view.leadingAnchor],
         [self.appSwitcherView.trailingAnchor constraintEqualToAnchor:self.rootViewController.view.trailingAnchor],
-        [self.appSwitcherView.heightAnchor constraintEqualToAnchor:self.rootViewController.view.heightAnchor multiplier:heightMultiplier]
+        _appSwitcherHeightConstraint
+        //[self.appSwitcherView.heightAnchor constraintEqualToAnchor:self.rootViewController.view.heightAnchor multiplier:0.55]
     ]];
     
     self.appSwitcherTopConstraint = [self.appSwitcherView.topAnchor constraintEqualToAnchor:self.rootViewController.view.bottomAnchor];
@@ -742,7 +743,7 @@
 - (void)showAppSwitcher
 {
     self.appSwitcherTopConstraint.active = NO;
-    self.appSwitcherTopConstraint = [self.appSwitcherView.centerYAnchor constraintEqualToAnchor:self.centerYAnchor];
+    self.appSwitcherTopConstraint = [self.appSwitcherView.bottomAnchor constraintEqualToAnchor:self.bottomAnchor];
     self.appSwitcherTopConstraint.active = YES;
 
     [UIView animateWithDuration:0.6 delay:0 usingSpringWithDamping:0.85 initialSpringVelocity:0.6 options:UIViewAnimationOptionCurveEaseInOut animations:^{
