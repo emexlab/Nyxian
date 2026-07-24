@@ -23,7 +23,7 @@
 #import <LindChain/WindowServer/Window/NXResizeHandle.h>
 #import <LindChain/WindowServer/Window/NXWindowBar.h>
 #import <LindChain/Private/UIKitPrivate.h>
-
+#import <LindChain/WindowServer/NXWindowServer.h>
 @implementation NXWindow {
     UIStackView *_contentStack;
     NXResizeHandle *_resizeHandle;
