@@ -44,6 +44,7 @@
     UIScrollView *_runningAppsScrollView;
     
     NXWindowLayerView *_windowLayer;
+    NSLayoutConstraint *_appSwitcherHeightConstraint;
 }
 
 - (instancetype)initWithWindowScene:(UIWindowScene *)windowScene
@@ -418,19 +419,15 @@
     
     self.appSwitcherView = container;
     [self.rootViewController.view addSubview:self.appSwitcherView];
-    BOOL isIPad = (UIDevice.currentDevice.userInterfaceIdiom == UIUserInterfaceIdiomPad);
-    UIInterfaceOrientation orientation = [UIApplication sharedApplication].windows.firstObject.windowScene.interfaceOrientation; 
-    BOOL isLandscape = UIInterfaceOrientationIsLandscape(orientation);
-    CGFloat heightMultiplier; 
-    if (isIPad) { 
-        heightMultiplier = isLandscape ? 0.50 : 0.25; 
-    } else { 
-        heightMultiplier = isLandscape ? 0.75 : 0.50; 
-    }
+    BOOL isIPad = (UIDevice.currentDevice.userInterfaceIdiom == UIUserInterfaceIdiomPad); 
+    UIInterfaceOrientation orientation = [UIApplication sharedApplication].windows.firstObject.windowScene.interfaceOrientation;  
+    BOOL isLandscape = UIInterfaceOrientationIsLandscape(orientation); 
+    CGFloat heightMultiplier = isIPad ? (isLandscape ? 0.50 : 0.25) : (isLandscape ? 0.75 : 0.50);
+    _appSwitcherHeightConstraint = [self.appSwitcherView.heightAnchor constraintEqualToAnchor:self.rootViewController.view.heightAnchor multiplier:heightMultiplier];
     [NSLayoutConstraint activateConstraints:@[
         [self.appSwitcherView.leadingAnchor constraintEqualToAnchor:self.rootViewController.view.leadingAnchor],
         [self.appSwitcherView.trailingAnchor constraintEqualToAnchor:self.rootViewController.view.trailingAnchor],
-        [self.appSwitcherView.heightAnchor constraintEqualToAnchor:self.rootViewController.view.heightAnchor multiplier:heightMultiplier]
+        //[self.appSwitcherView.heightAnchor constraintEqualToAnchor:self.rootViewController.view.heightAnchor multiplier:heightMultiplier]
     ]];
     
     self.appSwitcherTopConstraint = [self.appSwitcherView.topAnchor constraintEqualToAnchor:self.rootViewController.view.bottomAnchor];
@@ -759,6 +756,7 @@
         [self.appSwitcherView removeFromSuperview];
         self.appSwitcherView = nil;
         self.appSwitcherTopConstraint = nil;
+        self->_appSwitcherHeightConstraint = nil;
         self->_placeholderStack = nil;
         self->_stackView = nil;
         self->_runningAppsScrollView = nil;
