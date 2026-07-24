@@ -152,14 +152,15 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate, UITabBarControllerDeleg
         
         
         //if UIDevice.current.userInterfaceIdiom == .phone {
-            //if #available(iOS 26.0, *) {
-                //let fakeViewController: UIViewController = UIViewController()
-                //fakeViewController.tabBarItem = UITabBarItem(tabBarSystemItem: .search, tag: 2)
-                //fakeViewController.tabBarItem.title = "Switcher"
-                //fakeViewController.tabBarItem.image = UIImage(systemName: "iphone.app.switcher")
-                //viewControllers.append(fakeViewController)
-            //}
-        //}
+        if (![NXWindowServer isMultitaskingEnabled])
+            if #available(iOS 26.0, *) {
+                let fakeViewController: UIViewController = UIViewController()
+                fakeViewController.tabBarItem = UITabBarItem(tabBarSystemItem: .search, tag: 3)
+                fakeViewController.tabBarItem.title = "Switcher"
+                fakeViewController.tabBarItem.image = UIImage(systemName: "iphone.app.switcher")
+                viewControllers.append(fakeViewController)
+            }
+        }
         
         themedTabViewController.viewControllers = viewControllers
         themedTabViewController.delegate = self
@@ -190,10 +191,10 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate, UITabBarControllerDeleg
         if tabBarController.selectedViewController === viewController && Builder.builds {
             return false
         }
-        //if viewController.tabBarItem.tag == 2 {
-            //self.window?.showAppSwitcherExternal()
-            //return false
-        //}
+        if viewController.tabBarItem.tag == 3 {
+            self.window?.showAppSwitcherExternal()
+            return false
+        }
         return true
     }
     
