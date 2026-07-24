@@ -418,7 +418,7 @@
     
     self.appSwitcherView = container;
     [self.rootViewController.view addSubview:self.appSwitcherView];
-    BOOL isIPad = (UIDevice.currentDevice.userInterfaceIdiom  UIUserInterfaceIdiomPad);
+    BOOL isIPad = (UIDevice.currentDevice.userInterfaceIdiom == UIUserInterfaceIdiomPad);
     UIInterfaceOrientation orientation = [UIApplication sharedApplication].windows.firstObject.windowScene.interfaceOrientation; 
     BOOL isLandscape = UIInterfaceOrientationIsLandscape(orientation);
     CGFloat heightMultiplier; 
