@@ -165,7 +165,8 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate, UITabBarControllerDeleg
         
         themedTabViewController.viewControllers = viewControllers
         themedTabViewController.delegate = self
-        
+        updateTabBarItems()
+        NotificationCenter.default.addObserver(self, selector: #selector(multitaskingStateDidChange), name: NSNotification.Name("NXMultitaskingStateDidChange"), object: nil)
         self.window?.rootViewController = themedTabViewController
         self.window?.makeKeyAndVisible()
         
@@ -187,7 +188,41 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate, UITabBarControllerDeleg
         
         self.window?.rootViewController?.present(onboardingController, animated: false)
     }
+    @objc private func multitaskingStateDidChange() {
+        DispatchQueue.main.async {
+            self.updateTabBarItems()
+        }
+    }
+    private func updateTabBarItems() {
+        guard let themedTabViewController = self.themedTabViewController else { return }
+
+        let contentNavigationController = UINavigationController(rootViewController: ContentViewController())
+        let settingsNavigationController = UINavigationController(rootViewController: SettingsViewController())
+        let appsNavigationController = UINavigationController(rootViewController: ApplicationManagementViewController.shared)
     
+        contentNavigationController.tabBarItem = UITabBarItem(title: "Projects", image: UIImage(systemName: "square.grid.2x2.fill"), tag: 0)
+        settingsNavigationController.tabBarItem = UITabBarItem(title: "Settings", image: UIImage(systemName: "gear"), tag: 1)
+        appsNavigationController.tabBarItem = UITabBarItem(title: "Apps", image: UIImage(systemName: "app.badge"), tag: 2)
+
+        var viewControllers: [UIViewController] = [contentNavigationController, settingsNavigationController, appsNavigationController]
+
+   
+        if !NXWindowServer.isMultitaskingEnabled() {
+            if #available(iOS 26.0, *) {
+                let fakeViewController = UIViewController()
+                fakeViewController.tabBarItem = UITabBarItem(tabBarSystemItem: .search, tag: 3)
+                fakeViewController.tabBarItem.title = "Switcher"
+                fakeViewController.tabBarItem.image = UIImage(systemName: "iphone.app.switcher")
+                viewControllers.append(fakeViewController)
+            }
+        }
+
+        themedTabViewController.viewControllers = viewControllers
+    }
+
+    deinit {
+        NotificationCenter.default.removeObserver(self)
+    }
     func tabBarController(_ tabBarController: UITabBarController, shouldSelect viewController: UIViewController) -> Bool {
         if tabBarController.selectedViewController === viewController && Builder.builds {
             return false
