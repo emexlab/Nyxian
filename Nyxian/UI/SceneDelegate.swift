@@ -104,7 +104,7 @@ struct UIOnboardingHelper {
 
 class SceneDelegate: UIResponder, UIWindowSceneDelegate, UITabBarControllerDelegate, UIOnboardingViewControllerDelegate {
     var window: NXWindowServer?
-    
+    weak var themedTabViewController: UIThemedTabViewController?
     func scene(_ scene: UIScene, willConnectTo session: UISceneSession, options connectionOptions: UIScene.ConnectionOptions) {
         guard let windowScene = scene as? UIWindowScene else { return }
         
