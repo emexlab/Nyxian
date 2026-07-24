@@ -101,7 +101,7 @@
     [_session didMoveToParentViewController:self];
     
     //if(UIDevice.currentDevice.userInterfaceIdiom == UIUserInterfaceIdiomPad)
-    if(YES)
+    if([NXWindowServer isMultitaskingEnabled])
     {
         /* this is to move the window obviously */
         UIPanGestureRecognizer *moveGesture =
@@ -455,13 +455,14 @@
 {
     [super viewDidAppear:animated];
     
-    //dispatch_once(&_viewDidAppearOnceDispatch, ^{
+    dispatch_once(&_viewDidAppearOnceDispatch, ^{
         // MARK: Suppose to only run on phones
         //if([[UIDevice currentDevice] userInterfaceIdiom] == UIUserInterfaceIdiomPhone)
-        //{
-            //[self maximizeWindow:NO];
-        //}
-    //});
+        if(![NXWindowServer isMultitaskingEnabled])
+        {
+            [self maximizeWindow:NO];
+        }
+    });
 }
 
 - (void)touchesBegan:(NSSet<UITouch *> *)touches withEvent:(UIEvent *)event
