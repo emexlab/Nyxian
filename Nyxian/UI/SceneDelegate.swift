@@ -152,7 +152,7 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate, UITabBarControllerDeleg
         
         
         //if UIDevice.current.userInterfaceIdiom == .phone {
-        if (![NXWindowServer isMultitaskingEnabled])
+        if (![NXWindowServer isMultitaskingEnabled]){
             if #available(iOS 26.0, *) {
                 let fakeViewController: UIViewController = UIViewController()
                 fakeViewController.tabBarItem = UITabBarItem(tabBarSystemItem: .search, tag: 3)
