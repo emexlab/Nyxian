@@ -112,7 +112,7 @@
     ]];
 
     //if(isiPad)
-    if(YES)
+    if([NXWindowServer isMultitaskingEnabled])
     {
         _islandExpanded = NO;
         
