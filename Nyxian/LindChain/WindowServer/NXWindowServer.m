@@ -106,10 +106,18 @@
 + (BOOL)isMultitaskingEnabled
 {
     NSUserDefaults *defaults = [NSUserDefaults standardUserDefaults];
-    if ([defaults objectForKey:@"EnableMultitasking"] == nil) {
+    if ([defaults objectForKey:@"MultitaskingEnabled"] == nil) {
         return YES;
     }
-    return [defaults boolForKey:@"EnableMultitasking"];
+    return [defaults boolForKey:@"MultitaskingEnabled"];
+}
++ (BOOL)isMultitaskingEnabled {
+    return [[NSUserDefaults standardUserDefaults] boolForKey:@"MultitaskingEnabled"];
+}
+
++ (void)setMultitaskingEnabled:(BOOL)enabled {
+    [[NSUserDefaults standardUserDefaults] setBool:enabled forKey:@"MultitaskingEnabled"];
+    [[NSUserDefaults standardUserDefaults] synchronize];
 }
 
 - (void)moveWindowToFrontWithNumber:(NSNumber *)number
