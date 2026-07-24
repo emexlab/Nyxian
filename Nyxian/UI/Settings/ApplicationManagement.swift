@@ -215,6 +215,7 @@ class ApplicationManagementViewController: UIThemedTableViewController, UITextFi
         let newState = !currentState
         UserDefaults.standard.set(newState, forKey: "LCMultitaskingEnabled")
         NXWindowServer.setMultitaskingEnabled(newState)
+        NotificationCenter.default.post(name: NSNotification.Name("NXMultitaskingStateDidChange"), object: nil)
         updateMultitaskingButton()
     }
 
