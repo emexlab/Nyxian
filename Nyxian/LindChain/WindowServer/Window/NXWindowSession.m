@@ -26,6 +26,20 @@
 
 - (BOOL)openWindow
 {
+    if (!self.windowScene) { 
+        return NO; 
+    }
+    if([!NXWindowServer isMultitaskingEnabled]) {
+        self.isFullscreen = YES;
+        if (self.window) { 
+            if (!self.window.isMaximized) {
+                [self.window maximizeWindow:NO]; 
+            }
+            if (self.window.delegate) {
+                _startWindowRect = [self.window.delegate window:self.window wantsToChangeToRect:CGRectZero];
+            }
+        }
+    }
     _startWindowRect = CGRectMake(50, 50, 375, 667);
     return (self.windowScene != nil);
 }
