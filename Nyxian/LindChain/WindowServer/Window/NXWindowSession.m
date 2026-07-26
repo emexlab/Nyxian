@@ -27,14 +27,15 @@
 
 - (BOOL)openWindow
 {
-    UIEdgeInsets insets = self.safeAreaInsets;
-    CGRect bounds = self.bounds;
-    CGRect allowed = UIEdgeInsetsInsetRect(bounds, insets); 
-    _startWindowRect = allowed;
-    
+    UIView *view = self.view;
+
+    UIEdgeInsets insets = view.safeAreaInsets;
+    CGRect bounds = view.bounds;
+
+    _startWindowRect = UIEdgeInsetsInsetRect(bounds, insets);
+
     return (self.windowScene != nil);
 }
-
 
 - (BOOL)closeWindow
 {
