@@ -30,7 +30,7 @@
     if (!self.windowScene) { 
         return NO; 
     }
-    if([!NXWindowServer isMultitaskingEnabled]) {
+    if(![NXWindowServer isMultitaskingEnabled]) {
         self.isFullscreen = YES;
         if (self.window) { 
             if (!self.window.isMaximized) {
