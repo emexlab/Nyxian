@@ -27,13 +27,14 @@
 
 - (BOOL)openWindow
 {
+    if([NXWindowServer isMultitaskingEnabled]) {
+        _startWindowRect = CGRectMake(50, 50, 375, 667);
+        return (self.windowScene != nil);
+    }
     UIView *view = self.view;
-
     UIEdgeInsets insets = view.safeAreaInsets;
     CGRect bounds = view.bounds;
-
     _startWindowRect = UIEdgeInsetsInsetRect(bounds, insets);
-
     return (self.windowScene != nil);
 }
 
