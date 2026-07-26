@@ -88,7 +88,7 @@
         BOOL isIPad = (UIDevice.currentDevice.userInterfaceIdiom == UIUserInterfaceIdiomPad); 
         UIInterfaceOrientation orientation = self.windowScene.interfaceOrientation; 
         BOOL isLandscape = UIInterfaceOrientationIsLandscape(orientation);  
-        CGFloat newMultiplier = isIPad ? (isLandscape ? 0.50 : 0.40) : (isLandscape ? 0.90 : 0.50);
+        CGFloat newMultiplier = isIPad ? (isLandscape ? 0.48 : 0.36) : (isLandscape ? 0.90 : 0.45);
         if (fabs(_appSwitcherHeightConstraint.multiplier - newMultiplier) > 0.01) {
             _appSwitcherHeightConstraint.active = NO;
             _appSwitcherHeightConstraint = [self.appSwitcherView.heightAnchor constraintEqualToAnchor:self.rootViewController.view.heightAnchor multiplier:newMultiplier];
@@ -435,7 +435,7 @@
     BOOL isIPad = (UIDevice.currentDevice.userInterfaceIdiom == UIUserInterfaceIdiomPad); 
     UIInterfaceOrientation orientation = [UIApplication sharedApplication].windows.firstObject.windowScene.interfaceOrientation;  
     BOOL isLandscape = UIInterfaceOrientationIsLandscape(orientation); 
-    CGFloat heightMultiplier = isIPad ? (isLandscape ? 0.50 : 0.40) : (isLandscape ? 0.90 : 0.50);
+    CGFloat heightMultiplier = isIPad ? (isLandscape ? 0.48 : 0.36) : (isLandscape ? 0.90 : 0.45);
     _appSwitcherHeightConstraint = [self.appSwitcherView.heightAnchor constraintEqualToAnchor:self.rootViewController.view.heightAnchor multiplier:heightMultiplier];
     [NSLayoutConstraint activateConstraints:@[
         [self.appSwitcherView.leadingAnchor constraintEqualToAnchor:self.rootViewController.view.leadingAnchor],
