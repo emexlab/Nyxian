@@ -27,15 +27,12 @@
 
 - (BOOL)openWindow
 {
-    if (!self.windowScene) {
-        return NO;
-    }
-    if (!self.isMaximized) {
-        [self maximizeWindow:NO];
-    }
-    _startWindowRect = self.view.frame;
+    UIEdgeInsets insets = self.safeAreaInsets;
+    CGRect bounds = self.bounds;
+    CGRect allowed = UIEdgeInsetsInsetRect(bounds, insets); 
+    _startWindowRect = CGRect(allowed)
     
-    return YES;
+    return (self.windowScene != nil);
 }
 
 
