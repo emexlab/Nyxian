@@ -30,13 +30,14 @@
     if (!self.windowScene) {
         return NO;
     }
-    if (!_window.isMaximized) {
-        [_window maximizeWindow:NO];
+    if (!self.isMaximized) {
+        [self maximizeWindow:NO];
     }
-    _startWindowRect = [_window.delegate window:_window wantsToChangeToRect:CGRectZero];
+    _startWindowRect = self.view.frame;
     
     return YES;
 }
+
 
 - (BOOL)closeWindow
 {
