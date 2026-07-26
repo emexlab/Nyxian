@@ -30,19 +30,13 @@
     if (!self.windowScene) {
         return NO;
     }
-    self.isFullscreen = YES;
-    if (self.window) {
-        if (!self.window.isMaximized) {
-            [self.window maximizeWindow:NO];
-        }
-        if (self.window.delegate) {
-            _startWindowRect = [self.window.delegate window:self.window wantsToChangeToRect:CGRectZero];
-        }
+    if (!_window.isMaximized) {
+        [_window maximizeWindow:NO];
     }
+    _startWindowRect = [_window.delegate window:_window wantsToChangeToRect:CGRectZero];
     
-    return (self.windowScene != nil);
+    return YES;
 }
-
 
 - (BOOL)closeWindow
 {
