@@ -21,6 +21,7 @@
 
 #import <LindChain/WindowServer/Window/NXWindowSession.h>
 #import <LindChain/WindowServer/Window/NXWindow.h>
+#import <LindChain/WindowServer/NXWindowServer.h>
 
 @implementation NXWindowSession
 
