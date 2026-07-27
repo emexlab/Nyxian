@@ -192,10 +192,33 @@ class ApplicationManagementViewController: UIThemedTableViewController, UITextFi
         super.viewDidLoad()
         self.tableView.register(ProjectTableCell.self, forCellReuseIdentifier: ProjectTableCell.reuseIdentifier)
         LDEApplicationWorkspace.shared().ping()
-        self.title = "Applications"
+        self.title = "Apps"
         self.navigationItem.rightBarButtonItem = UIBarButtonItem(title: nil, image: UIImage(systemName: "square.and.arrow.down.fill"), target: self, action: #selector(plusButtonPressed))
+        updateMultitaskingButton()
     }
+    private func updateMultitaskingButton() {
+        let isEnabled = NXWindowServer.isMultitaskingEnabled()
     
+        let imageName = isEnabled ? "square.on.square" : "iphone"
+    
+        let toggleItem = UIBarButtonItem(
+            image: UIImage(systemName: imageName),
+            style: .plain,
+            target: self,
+            action: #selector(toggleMultitasking)
+        )
+        self.navigationItem.leftBarButtonItem = toggleItem
+    }
+
+    @objc private func toggleMultitasking() {
+        let currentState = NXWindowServer.isMultitaskingEnabled()
+        let newState = !currentState
+        UserDefaults.standard.set(newState, forKey: "LCMultitaskingEnabled")
+        NXWindowServer.setMultitaskingEnabled(newState)
+        NotificationCenter.default.post(name: NSNotification.Name("NXMultitaskingStateDidChange"), object: nil)
+        updateMultitaskingButton()
+    }
+
     override func viewDidAppear(_ animated: Bool) {
         super.viewDidAppear(animated)
     }
