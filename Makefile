@@ -106,12 +106,15 @@ all: SCHEME := Nyxian
 all: FILE := emexDE.ipa
 all: clean check compile package-app clean
 
+
 # Dependencies
 CoreCompiler/CoreCompilerSupportLibs:
-	cd LLVM-On-iOS; $(MAKE)
-	rm -rf CoreCompiler/CoreCompilerSupportLibs
-	cp -r LLVM-On-iOS/CoreCompilerSupportLibs CoreCompiler/CoreCompilerSupportLibs
-	cp -r LLVM-On-iOS/LLVM.xcframework CoreCompiler/CoreCompilerSupportLibs/LLVM.xcframework
+	mkdir -p CoreCompiler/CoreCompilerSupportLibs
+	@if [ -d "Shared/SwiftToolchain" ]; then \
+		cp -a Shared/SwiftToolchain/* CoreCompiler/CoreCompilerSupportLibs/ 2>/dev/null || true; \
+	fi
+	
+
 
 # Helper
 update-config:
