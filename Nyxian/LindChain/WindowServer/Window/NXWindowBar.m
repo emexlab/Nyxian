@@ -20,7 +20,7 @@
 */
 
 #import <LindChain/WindowServer/Window/NXWindowBar.h>
-
+#import <LindChain/WindowServer/NXWindowServer.h>
 @implementation NXWindowBar {
     UIView *_bottomBorder;
 
@@ -52,7 +52,7 @@
     self.clipsToBounds = NO;
 
     BOOL isiPad  = (UIDevice.currentDevice.userInterfaceIdiom == UIUserInterfaceIdiomPad);
-    CGFloat barH = isiPad ? 38.0 : 50.0;
+    CGFloat barH = isiPad ? 44.0 : 44.0;
     
     _safeAreaFill = [[UIView alloc] init];
     _safeAreaFill.translatesAutoresizingMaskIntoConstraints = NO;
@@ -81,7 +81,7 @@
     _titleLabel.text = title;
     _titleLabel.translatesAutoresizingMaskIntoConstraints = NO;
     _titleLabel.textAlignment = NSTextAlignmentCenter;
-    _titleLabel.font = [UIFont systemFontOfSize:isiPad ? 13 : 17 weight:UIFontWeightSemibold];
+    _titleLabel.font = [UIFont systemFontOfSize:isiPad ? 17 : 17 weight:UIFontWeightSemibold];
     [self addSubview:_titleLabel];
 
     UIView *border = [[UIView alloc] init];
@@ -93,7 +93,8 @@
     _windowBarHeightConstraint = [self.heightAnchor constraintEqualToConstant:barH];
     _windowBarHeightConstraint.active = YES;
 
-    if([[UIDevice currentDevice] userInterfaceIdiom] == UIUserInterfaceIdiomPad)
+    //if([[UIDevice currentDevice] userInterfaceIdiom] == UIUserInterfaceIdiomPad)
+    if([NXWindowServer isMultitaskingEnabled])
     {
         [_titleLabel.centerYAnchor constraintEqualToAnchor:self.bottomAnchor constant:-19.0].active = YES;
     }
@@ -110,7 +111,8 @@
         [border.bottomAnchor constraintEqualToAnchor:self.bottomAnchor],
     ]];
 
-    if(isiPad)
+    //if(isiPad)
+    if([NXWindowServer isMultitaskingEnabled])
     {
         _islandExpanded = NO;
         
@@ -365,12 +367,13 @@
 
 - (void)setFullscreen:(BOOL)fullscreen animated:(BOOL)animated
 {
-    if([[UIDevice currentDevice] userInterfaceIdiom] == UIUserInterfaceIdiomPad)
+    //if([[UIDevice currentDevice] userInterfaceIdiom] == UIUserInterfaceIdiomPad)
+    if(YES)
     {
-        CGFloat safeTop = self.window.safeAreaInsets.top;
-        CGFloat baseHeight = 38.0;
+        //CGFloat safeTop = self.window.safeAreaInsets.top;
+        CGFloat baseHeight = 44.0;
         
-        CGFloat newHeight = fullscreen ? baseHeight + safeTop : baseHeight;
+        CGFloat newHeight = baseHeight;
         
         void (^changes)(void) = ^{
             self->_windowBarHeightConstraint.constant = newHeight;
