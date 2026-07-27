@@ -44,6 +44,7 @@
     UIScrollView *_runningAppsScrollView;
     
     NXWindowLayerView *_windowLayer;
+    NSLayoutConstraint *_appSwitcherHeightConstraint;
 }
 
 - (instancetype)initWithWindowScene:(UIWindowScene *)windowScene
@@ -63,7 +64,8 @@
         _activeWindowIdentifier = (id_t)-1;
         _appSwitcherView = nil;
         
-        if(UIDevice.currentDevice.userInterfaceIdiom == UIUserInterfaceIdiomPad)
+        //if(UIDevice.currentDevice.userInterfaceIdiom == UIUserInterfaceIdiomPad)
+        if(YES)
         {
             [[UIDevice currentDevice] beginGeneratingDeviceOrientationNotifications];
             [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(orientationChanged:) name:UIDeviceOrientationDidChangeNotification object:nil];
@@ -82,6 +84,19 @@
 {
     [super layoutSubviews];
     _windowLayer.frame = self.bounds;
+    if (self.appSwitcherView && _appSwitcherHeightConstraint) { 
+        BOOL isIPad = (UIDevice.currentDevice.userInterfaceIdiom == UIUserInterfaceIdiomPad); 
+        UIInterfaceOrientation orientation = self.windowScene.interfaceOrientation; 
+        BOOL isLandscape = UIInterfaceOrientationIsLandscape(orientation);  
+        CGFloat newMultiplier = isIPad ? (isLandscape ? 0.48 : 0.36) : (isLandscape ? 0.90 : 0.45);
+        if (fabs(_appSwitcherHeightConstraint.multiplier - newMultiplier) > 0.01) {
+            _appSwitcherHeightConstraint.active = NO;
+            _appSwitcherHeightConstraint = [self.appSwitcherView.heightAnchor constraintEqualToAnchor:self.rootViewController.view.heightAnchor multiplier:newMultiplier];
+            _appSwitcherHeightConstraint.active = YES;
+            [self.rootViewController.view setNeedsLayout];
+            [self.rootViewController.view layoutIfNeeded];
+        }
+    }
 }
 
 + (instancetype)sharedWithWindowScene:(UIWindowScene*)windowScene
@@ -101,6 +116,19 @@
 + (instancetype)shared
 {
     return [self sharedWithWindowScene:nil];
+}
++ (BOOL)isMultitaskingEnabled
+{
+    NSUserDefaults *defaults = [NSUserDefaults standardUserDefaults];
+    if ([defaults objectForKey:@"MultitaskingEnabled"] == nil) {
+        return YES;
+    }
+    return [defaults boolForKey:@"MultitaskingEnabled"];
+}
+
++ (void)setMultitaskingEnabled:(BOOL)enabled {
+    [[NSUserDefaults standardUserDefaults] setBool:enabled forKey:@"MultitaskingEnabled"];
+    [[NSUserDefaults standardUserDefaults] synchronize];
 }
 
 - (void)moveWindowToFrontWithNumber:(NSNumber *)number
@@ -200,7 +228,8 @@
 
 - (void)windowsGetOutOfMyWay
 {
-    if(UIDevice.currentDevice.userInterfaceIdiom != UIUserInterfaceIdiomPad)
+    //if(UIDevice.currentDevice.userInterfaceIdiom != UIUserInterfaceIdiomPad)
+    if(![NXWindowServer isMultitaskingEnabled])
     {
         return;
     }
@@ -212,7 +241,8 @@
 
 - (void)windowsGetInMyWay
 {
-    if(UIDevice.currentDevice.userInterfaceIdiom != UIUserInterfaceIdiomPad)
+    //if(UIDevice.currentDevice.userInterfaceIdiom != UIUserInterfaceIdiomPad)
+    if(![NXWindowServer isMultitaskingEnabled])
     {
         return;
     }
@@ -260,8 +290,9 @@
     
     NXWindow *window = self.windows[@(_activeWindowIdentifier)];
     if(window != nil &&
-       _activeWindowIdentifier != window.identifier &&
-       [[UIDevice currentDevice] userInterfaceIdiom] != UIUserInterfaceIdiomPad)
+       _activeWindowIdentifier != window.identifier && ![NXWindowServer isMultitaskingEnabled])
+       
+       //[[UIDevice currentDevice] userInterfaceIdiom] != UIUserInterfaceIdiomPad)
     {
         // close first the old one and wait
         [self deactivateWindowByPullDown:YES withIdentifier:_activeWindowIdentifier withCompletion:^{
@@ -314,18 +345,18 @@
     [self bringSubviewToFront:_windowLayer];
     [_windowLayer setUserInteractionEnabled:YES];
 
-    if(UIDevice.currentDevice.userInterfaceIdiom == UIUserInterfaceIdiomPhone)
-    {
+    //if(UIDevice.currentDevice.userInterfaceIdiom == UIUserInterfaceIdiomPhone)
+    //{
         /* iOS 26 and above uses the tabbar button instead of gesture */
-        if(@available(iOS 26.0, *))
-        {
-            return;
-        }
+        //if(@available(iOS 26.0, *))
+        //{
+            //return;
+        //}
             
         /* add the gesture */
-        UILongPressGestureRecognizer *gestureRecognizer = [[UILongPressGestureRecognizer alloc] initWithTarget:self action:@selector(handleLongPress:)];
-        [self addGestureRecognizer:gestureRecognizer];
-    }
+        //UILongPressGestureRecognizer *gestureRecognizer = [[UILongPressGestureRecognizer alloc] initWithTarget:self action:@selector(handleLongPress:)];
+        //[self addGestureRecognizer:gestureRecognizer];
+    //}
 }
 
 // TODO: FRIDA! PLS MAKE LDEWINDOWSERVERTILEVIEW!!!! IM SO LAZY ONG
@@ -342,6 +373,7 @@
         [self showAppSwitcher];
     }
 }
+
 
 - (void)buildAppSwitcherView
 {
@@ -400,11 +432,16 @@
     
     self.appSwitcherView = container;
     [self.rootViewController.view addSubview:self.appSwitcherView];
-    
+    BOOL isIPad = (UIDevice.currentDevice.userInterfaceIdiom == UIUserInterfaceIdiomPad); 
+    UIInterfaceOrientation orientation = [UIApplication sharedApplication].windows.firstObject.windowScene.interfaceOrientation;  
+    BOOL isLandscape = UIInterfaceOrientationIsLandscape(orientation); 
+    CGFloat heightMultiplier = isIPad ? (isLandscape ? 0.48 : 0.36) : (isLandscape ? 0.90 : 0.45);
+    _appSwitcherHeightConstraint = [self.appSwitcherView.heightAnchor constraintEqualToAnchor:self.rootViewController.view.heightAnchor multiplier:heightMultiplier];
     [NSLayoutConstraint activateConstraints:@[
         [self.appSwitcherView.leadingAnchor constraintEqualToAnchor:self.rootViewController.view.leadingAnchor],
         [self.appSwitcherView.trailingAnchor constraintEqualToAnchor:self.rootViewController.view.trailingAnchor],
-        [self.appSwitcherView.heightAnchor constraintEqualToAnchor:self.rootViewController.view.heightAnchor multiplier:0.55]
+        _appSwitcherHeightConstraint
+        //[self.appSwitcherView.heightAnchor constraintEqualToAnchor:self.rootViewController.view.heightAnchor multiplier:0.55]
     ]];
     
     self.appSwitcherTopConstraint = [self.appSwitcherView.topAnchor constraintEqualToAnchor:self.rootViewController.view.bottomAnchor];
@@ -418,6 +455,8 @@
     self.impactGenerator = [[UIImpactFeedbackGenerator alloc] initWithStyle:UIImpactFeedbackStyleMedium];
     [self.impactGenerator prepare];
 }
+
+
 
 - (UIVisualEffectView *)createBlurEffectView
 {
@@ -704,7 +743,7 @@
 - (void)showAppSwitcher
 {
     self.appSwitcherTopConstraint.active = NO;
-    self.appSwitcherTopConstraint = [self.appSwitcherView.topAnchor constraintEqualToAnchor:self.centerYAnchor];
+    self.appSwitcherTopConstraint = [self.appSwitcherView.bottomAnchor constraintEqualToAnchor:self.bottomAnchor];
     self.appSwitcherTopConstraint.active = YES;
 
     [UIView animateWithDuration:0.6 delay:0 usingSpringWithDamping:0.85 initialSpringVelocity:0.6 options:UIViewAnimationOptionCurveEaseInOut animations:^{
@@ -731,6 +770,7 @@
         [self.appSwitcherView removeFromSuperview];
         self.appSwitcherView = nil;
         self.appSwitcherTopConstraint = nil;
+        self->_appSwitcherHeightConstraint = nil;
         self->_placeholderStack = nil;
         self->_stackView = nil;
         self->_runningAppsScrollView = nil;
@@ -881,17 +921,18 @@
     /* calculating fullscreen rectangle */
     CGRect allowed = UIEdgeInsetsInsetRect(bounds, insets);
     CGRect boundsInset = allowed;
-    allowed.size.height += insets.bottom;
+    //allowed.size.height += insets.bottom;
     
     /* checking if maximised */
     if(window.isMaximized)
     {
-        if([[UIDevice currentDevice] userInterfaceIdiom] == UIUserInterfaceIdiomPad)
+        //if([[UIDevice currentDevice] userInterfaceIdiom] == UIUserInterfaceIdiomPad)
+        if(YES)
         {
-            return self.bounds;
-        }
-        else
-        {
+            //return self.bounds;
+        //}
+        //else
+        //{
             return allowed;
         }
     }
@@ -943,6 +984,7 @@
                 [window changeWindowToRect:[self window:window wantsToChangeToRect:window.view.frame] completion:nil];
             }
         }
+        [self layoutIfNeeded];
     });
 }
 
