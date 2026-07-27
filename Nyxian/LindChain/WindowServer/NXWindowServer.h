@@ -59,8 +59,8 @@ static NXWindowServerPresentationState const NXWindowServerPresentationStateOutO
 - (void)windowsGetInMyWay;
 
 - (void)showAppSwitcherExternal;
-
++ (BOOL)isMultitaskingEnabled;
++ (void)setMultitaskingEnabled:(BOOL)enabled;
 @end
 
 #endif /* NXWINDOWSERVER_H */
-
