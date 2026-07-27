@@ -23,7 +23,7 @@
 #import <LindChain/WindowServer/Window/NXResizeHandle.h>
 #import <LindChain/WindowServer/Window/NXWindowBar.h>
 #import <LindChain/Private/UIKitPrivate.h>
-
+#import <LindChain/WindowServer/NXWindowServer.h>
 @implementation NXWindow {
     UIStackView *_contentStack;
     NXResizeHandle *_resizeHandle;
@@ -71,10 +71,10 @@
     _contentStack.backgroundColor = UIColor.systemBackgroundColor;
     
     _contentStack.layer.cornerRadius = 20;
-    if(UIDevice.currentDevice.userInterfaceIdiom == UIUserInterfaceIdiomPhone)
-    {
-        _contentStack.layer.maskedCorners = kCALayerMinXMinYCorner | kCALayerMaxXMinYCorner;
-    }
+    //if(UIDevice.currentDevice.userInterfaceIdiom == UIUserInterfaceIdiomPhone)
+    //{
+        //_contentStack.layer.maskedCorners = kCALayerMinXMinYCorner | kCALayerMaxXMinYCorner;
+    //}
     _contentStack.layer.masksToBounds = YES;
     [self.view addSubview:_contentStack];
     
@@ -100,7 +100,8 @@
     [_contentStack sendSubviewToBack:_session.view];
     [_session didMoveToParentViewController:self];
     
-    if(UIDevice.currentDevice.userInterfaceIdiom == UIUserInterfaceIdiomPad)
+    //if(UIDevice.currentDevice.userInterfaceIdiom == UIUserInterfaceIdiomPad)
+    if([NXWindowServer isMultitaskingEnabled])
     {
         /* this is to move the window obviously */
         UIPanGestureRecognizer *moveGesture =
@@ -290,10 +291,10 @@
             self.view.frame = newFrame;
             [self.view layoutIfNeeded];
             
-            if(UIDevice.currentDevice.userInterfaceIdiom != UIUserInterfaceIdiomPhone)
-            {
-                self->_contentStack.layer.cornerRadius = 0;
-            }
+            //if(UIDevice.currentDevice.userInterfaceIdiom != UIUserInterfaceIdiomPhone)
+            //{
+                //self->_contentStack.layer.cornerRadius = 0;
+            //}
             self->_contentStack.layer.borderWidth = 0;
             self.view.layer.shadowOpacity = 0;
             self->_resizeHandle.hidden = YES;
@@ -456,7 +457,8 @@
     
     dispatch_once(&_viewDidAppearOnceDispatch, ^{
         // MARK: Suppose to only run on phones
-        if([[UIDevice currentDevice] userInterfaceIdiom] == UIUserInterfaceIdiomPhone)
+        //if([[UIDevice currentDevice] userInterfaceIdiom] == UIUserInterfaceIdiomPhone)
+        if(![NXWindowServer isMultitaskingEnabled])
         {
             [self maximizeWindow:NO];
         }
@@ -551,4 +553,3 @@
 }
 
 @end
-
