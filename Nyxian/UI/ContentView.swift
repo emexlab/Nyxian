@@ -54,8 +54,8 @@ import UIKit
             target: self,
             action: #selector(presentImportPicker)
         )
-        self.navigationItem.setRightBarButtonItems([createItem, importItem], animated: false)
-        
+        self.navigationItem.setRightBarButtonItems([createItem], animated: false)
+        self.navigationItem.setLeftBarButtonItems([importItem], animated: false)
         self.tableView.register(UITableViewCell.self, forCellReuseIdentifier: "Cell")
         
         let rawProjectsList = NXProject.listProjects(at: NXBootstrap.shared().rootURL.appendingPathComponent("Projects")) as! [String:[NXProject]]
