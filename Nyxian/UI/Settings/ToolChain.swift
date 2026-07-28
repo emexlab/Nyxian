@@ -40,7 +40,7 @@ class ToolChainController: UIThemedTableViewController {
     }
     
     override func tableView(_ tableView: UITableView, numberOfRowsInSection section: Int) -> Int {
-        return (section == 2) ? 2 : 1
+        return (section == 2) ? 3 : 1
     }
     
     override func tableView(_ tableView: UITableView, titleForFooterInSection section: Int) -> String? {
@@ -85,10 +85,16 @@ class ToolChainController: UIThemedTableViewController {
                 cell = UITableViewCell()
                 cell.textLabel?.text = "Clear Module Cache"
                 break
-            default:
+            case 1:
                 cell = UITableViewCell()
                 cell.textLabel?.text = "Clear Project Cache"
                 break
+             case 2:
+                cell = UITableViewCell()
+                cell.textLabel?.text = "Clear App Cache"
+            default:
+                cell = UITableViewCell()
+                cell.textLabel?.text = "Unexpected Row"
             }
             break
         }
@@ -103,12 +109,70 @@ class ToolChainController: UIThemedTableViewController {
             case 0:
                 NXBootstrap.shared().clear(NXBootstrap.shared().swiftModuleCacheURL)
                 break
-            default:
+            case 1:
                 NXBootstrap.shared().clear(NXBootstrap.shared().cacheURL)
+                break
+            case 2:
+                clearGuestAppCaches()
+                break
+            default:
                 break
             }
             try? FileManager.default.removeItem(at: NXBootstrap.shared().swiftModuleCacheURL)
         }
         tableView.deselectRow(at: indexPath, animated: true)
+    }
+    private func clearGuestAppCaches() {
+        let fm = FileManager.default
+        let emexCache = fm.urls(
+            for: .cachesDirectory,
+            in: .userDomainMask
+        ).first
+        if let emexCache {
+            try? fm.removeItem(at: emexCache)
+            try? fm.createDirectory(
+                at: emexCache,
+                withIntermediateDirectories: true
+            )
+        }
+        let tmp = URL(fileURLWithPath: NSTemporaryDirectory())
+        if fm.fileExists(atPath: tmp.path) {
+            try? fm.removeItem(at: tmp)
+            try? fm.createDirectory(
+                at: tmp,
+                withIntermediateDirectories: true
+            )
+        }
+        let documents = FileManager.default.urls(
+            for: .documentDirectory,
+            in: .userDomainMask
+        ).first!
+        let dataApplication = documents
+            .appendingPathComponent("Data/Application")
+        guard fm.fileExists(atPath: dataApplication.path)
+        else {
+            return
+        }
+        if let containers = try? fm.contentsOfDirectory(
+            at: dataApplication,
+            includingPropertiesForKeys: nil
+        ) {
+            for container in containers {
+                let cache = container
+                    .appendingPathComponent("Library/Caches")
+                let tmp = container
+                    .appendingPathComponent("Tmp")
+                try? fm.removeItem(at: cache)
+                try? fm.createDirectory(
+                    at: cache,
+                    withIntermediateDirectories: true
+                )
+                try? fm.removeItem(at: tmp)
+                try? fm.createDirectory(
+                    at: tmp,
+                    withIntermediateDirectories: true
+                )
+            }
+        }
     }
 }
