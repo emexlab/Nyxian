@@ -37,28 +37,47 @@ jobs:
           brew install ldid dpkg libarchive
 
       - name: Setup LLVM Toolchain
-        run: |
-          set -e
-          GH_REPO="ruri1208/LLVM-On-iOS"
-
-          
-          mkdir -p CoreCompiler/CoreCompilerSupportLibs
-
-          
-          RUN_ID=$(gh run list --repo "$GH_REPO" --status success --limit 1 --json databaseId -q '.[0].databaseId')
-
-           
-          gh run download "$RUN_ID" --repo "$GH_REPO" -n "CoreCompilerSupportLibs" --dir CoreCompiler/
-          tar -xJ -f CoreCompiler/CoreCompilerSupportLibs.tar.xz -C CoreCompiler/ && rm CoreCompiler/CoreCompilerSupportLibs.tar.xz
-
-          
-          gh run download "$RUN_ID" --repo "$GH_REPO" -n "LLVM.xcframework" --dir CoreCompiler/CoreCompilerSupportLibs/
-          tar -xJ -f CoreCompiler/CoreCompilerSupportLibs/LLVM.xcframework.tar.xz -C CoreCompiler/CoreCompilerSupportLibs/ && rm CoreCompiler/CoreCompilerSupportLibs/LLVM.xcframework.tar.xz
-
-          
-          rm -rf Shared/SwiftToolchain
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        
+          LLVM_RUN_ID: "29906841202"
+        run: |
+          set -e
+
+          GH_REPO="ruri1208/LLVM-On-iOS"
+
+          mkdir -p CoreCompiler/CoreCompilerSupportLibs
+
+          if [ -n "$LLVM_RUN_ID" ]; then
+            RUN_ID="$LLVM_RUN_ID"
+            echo "Using specified workflow run: $RUN_ID"
+          else
+            RUN_ID=$(gh run list \
+              --repo "$GH_REPO" \
+              --status success \
+              --limit 1 \
+              --json databaseId \
+              -q '.[0].databaseId')
+            echo "Using latest successful workflow run: $RUN_ID"
+          fi
+
+          gh run download "$RUN_ID" \
+            --repo "$GH_REPO" \
+            -n "CoreCompilerSupportLibs" \
+            --dir CoreCompiler/
+
+          tar -xJ -f CoreCompiler/CoreCompilerSupportLibs.tar.xz -C CoreCompiler/
+          rm CoreCompiler/CoreCompilerSupportLibs.tar.xz
+
+          gh run download "$RUN_ID" \
+            --repo "$GH_REPO" \
+            -n "LLVM.xcframework" \
+            --dir CoreCompiler/CoreCompilerSupportLibs/
+
+          tar -xJ -f CoreCompiler/CoreCompilerSupportLibs/LLVM.xcframework.tar.xz -C CoreCompiler/CoreCompilerSupportLibs/
+          rm CoreCompiler/CoreCompilerSupportLibs/LLVM.xcframework.tar.xz
+
+          rm -rf Shared/SwiftToolchain
 
       - name: Build Nyxian
         timeout-minutes: 1200
