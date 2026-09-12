@@ -20,7 +20,7 @@
  along with Nyxian. If not, see <https://www.gnu.org/licenses/>.
 */
 
-#include <LindChain/ProcEnvironment/Surface/sys/core.h>
+#include <LindChain/ProcEnvironment/Surface/libkern/sys/core.h>
 #include <os/lock.h>
 
 syscall_server_t* syscall_server_create(void)

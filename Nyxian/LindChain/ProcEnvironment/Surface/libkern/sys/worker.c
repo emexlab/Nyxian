@@ -20,8 +20,8 @@
  along with Nyxian. If not, see <https://www.gnu.org/licenses/>.
 */
 
-#include <LindChain/ProcEnvironment/Surface/sys/worker.h>
-#include <LindChain/ProcEnvironment/Surface/sys/core.h>
+#include <LindChain/ProcEnvironment/Surface/libkern/sys/worker.h>
+#include <LindChain/ProcEnvironment/Surface/libkern/sys/core.h>
 #include <LindChain/ProcEnvironment/Surface/proc/proc.h>
 #import <LindChain/ProcEnvironment/Utils/kpanic.h>
 #include <LindChain/ProcEnvironment/Utils/klog.h>

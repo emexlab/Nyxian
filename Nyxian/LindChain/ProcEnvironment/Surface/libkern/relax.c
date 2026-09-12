@@ -21,6 +21,7 @@
 
 #include <LindChain/ProcEnvironment/Surface/libkern/relax.h>
 
+
 void relax(void)
 {
 #if defined(__x86_64__) || defined(__i386__)

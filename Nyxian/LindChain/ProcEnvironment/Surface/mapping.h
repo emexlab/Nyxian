@@ -22,10 +22,10 @@
 #ifndef PROCENVIRONMENT_MAPPING_H
 #define PROCENVIRONMENT_MAPPING_H
 
+#include <LindChain/ProcEnvironment/Surface/libkern/sys/core.h>
+#include <LindChain/ProcEnvironment/Surface/libkern/radix/radix.h>
 #include <LindChain/ProcEnvironment/Surface/proc/def.h>
 #include <LindChain/ProcEnvironment/Surface/tty/def.h>
-#include <LindChain/ProcEnvironment/Surface/sys/core.h>
-#include <LindChain/ProcEnvironment/Surface/libkern/radix/radix.h>
 #include <LindChain/ProcEnvironment/Surface/lock.h>
 #include <LindChain/ProcEnvironment/Surface/key.h>
 #include <stdint.h>
@@ -33,7 +33,6 @@
 #include <pthread.h>
 
 typedef struct {
-    
     /*
      * syscall server which handles certain
      * syscalls made by userspace processes.

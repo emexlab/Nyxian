@@ -23,7 +23,7 @@
 #ifndef SYS_WORKER_H
 #define SYS_WORKER_H
 
-#include <LindChain/ProcEnvironment/Surface/sys/payload.h>
+#include <LindChain/ProcEnvironment/Surface/libkern/sys/systm.h>
 #include <LindChain/ProcEnvironment/Surface/proc/def.h>
 #include <mach/mach.h>
 #include <stdint.h>

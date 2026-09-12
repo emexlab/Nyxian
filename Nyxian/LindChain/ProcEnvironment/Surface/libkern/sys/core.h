@@ -23,7 +23,7 @@
 #ifndef SYS_CORE_H
 #define SYS_CORE_H
 
-#include <LindChain/ProcEnvironment/Surface/sys/worker.h>
+#include <LindChain/ProcEnvironment/Surface/libkern/sys/worker.h>
 #include <os/lock.h>
 #include <stdint.h>
 

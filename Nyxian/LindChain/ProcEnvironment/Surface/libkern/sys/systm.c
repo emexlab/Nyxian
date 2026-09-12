@@ -20,18 +20,19 @@
  along with Nyxian. If not, see <https://www.gnu.org/licenses/>.
 */
 
-#include <LindChain/ProcEnvironment/Surface/sys/payload.h>
+#include <LindChain/ProcEnvironment/Surface/libkern/sys/systm.h>
+#include <LindChain/Private/mach/mach_vm.h>
 #include <assert.h>
 
 kern_return_t syscall_payload_create(void *ptr,
                                      size_t size,
-                                     vm_address_t *vm_address)
+                                     mach_vm_address_t *mach_vm_address)
 {
-    kern_return_t kr = vm_allocate(mach_task_self(), vm_address, size, VM_FLAGS_ANYWHERE);
+    kern_return_t kr = mach_vm_allocate(mach_task_self(), mach_vm_address, size, VM_FLAGS_ANYWHERE);
     if(kr == KERN_SUCCESS && ptr != NULL)
     {
         /* you belong into here buffer pointed to by ptr ^^ */
-        memcpy((void*)(*vm_address), ptr, size);
+        memcpy((void*)(*mach_vm_address), ptr, size);
     }
     
     /* returning the kernels opinion of all this :/ (mom, i didnt broke the vase) */
@@ -54,8 +55,8 @@ bool syscall_copy_in(task_t task,
      * reading userspace buffer into virtual kernel
      * space.
      */
-    vm_size_t reply = 0;
-    kern_return_t kr = vm_read_overwrite(task, (vm_address_t)src, size, (vm_address_t)kptr, &reply);
+    mach_vm_size_t reply = 0;
+    kern_return_t kr = mach_vm_read_overwrite(task, (vm_address_t)src, size, (vm_address_t)kptr, &reply);
     if(kr != KERN_SUCCESS || reply < size)
     {
         return false;
@@ -109,7 +110,7 @@ bool syscall_copy_out(task_t task,
      * dont worry tho we dont need to know how much
      * was written, because thats not our buisness.
      */
-    kern_return_t kr = vm_write(task, (vm_address_t)dst, (vm_offset_t)kptr, (mach_msg_type_number_t)size);
+    kern_return_t kr = mach_vm_write(task, (mach_vm_address_t)dst, (mach_vm_offset_t)kptr, (mach_msg_type_number_t)size);
     if(kr != KERN_SUCCESS)
     {
         
@@ -138,8 +139,8 @@ char *syscall_copy_str_in(task_t task,
     size_t off = 0;
     while(off < len)
     {
-        vm_address_t addr = (vm_address_t)src + off;
-        size_t want = PAGE_SIZE - (addr & (PAGE_SIZE - 1));
+        mach_vm_address_t addr = (mach_vm_address_t)src + off;
+        mach_vm_size_t want = PAGE_SIZE - (addr & (PAGE_SIZE - 1));
         
         if(want > len - off)
         {
@@ -163,8 +164,8 @@ char *syscall_copy_str_in(task_t task,
             cap = ncap;
         }
         
-        vm_size_t rlen = 0;
-        kern_return_t kr = vm_read_overwrite(task, addr, want, (vm_address_t)(buf + off), &rlen);
+        mach_vm_size_t rlen = 0;
+        kern_return_t kr = mach_vm_read_overwrite(task, addr, want, (mach_vm_address_t)(buf + off), &rlen);
         if(kr != KERN_SUCCESS || rlen != want)
         {
             free(buf);

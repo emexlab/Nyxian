@@ -30,7 +30,7 @@
 typedef void* userspace_pointer_t;
 typedef void* kernelspace_pointer_t;
 
-kern_return_t syscall_payload_create(void *ptr, size_t size, vm_address_t *vm_address);
+kern_return_t syscall_payload_create(void *ptr, size_t size, mach_vm_address_t *mach_vm_address);
 
 bool syscall_copy_in(task_t task, size_t size, kernelspace_pointer_t kptr, userspace_pointer_t src);
 kernelspace_pointer_t syscall_alloc_in(task_t task, size_t size, userspace_pointer_t src);
