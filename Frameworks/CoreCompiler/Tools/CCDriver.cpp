@@ -377,10 +377,9 @@ static void CollapseArgsToWl(CFMutableArrayRef argsArray)
     CFRelease(passthrough);
 }
 
-CFArrayRef CCDriverCreateJobs(CCDriverRef driver)
+CFArrayRef CCDriverCreateJobs(CFAllocatorRef allocator,
+                              CCDriverRef driver)
 {
-    CFAllocatorRef allocator = CFGetAllocator(driver);
-    
     llvm::SmallVector<const char *, 64> Args;
     Args.reserve(driver->argStorage.size());
     for(const auto &s : driver->argStorage)

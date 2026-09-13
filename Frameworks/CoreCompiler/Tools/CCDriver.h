@@ -41,7 +41,7 @@ CC_EXPORT CFTypeID CCDriverGetTypeID(void);
 
 CC_EXPORT CCDriverRef CCDriverCreate(CFAllocatorRef allocator, CFArrayRef arguments, CCDriverType type);
 
-CC_EXPORT CFArrayRef CCDriverCreateJobs(CCDriverRef driver);
+CC_EXPORT CFArrayRef CCDriverCreateJobs(CFAllocatorRef allocator, CCDriverRef driver);
 
 CC_EXPORT void CCDriverSetOutputPathCallback(CCDriverRef driver, CCOutputPathCallback callback, void *context);
 CC_EXPORT void *CCDriverGetOutputPathCallbackContext(CCDriverRef driver);

@@ -79,7 +79,7 @@ static const void *MDKDriverDelegateKey = &MDKDriverDelegateKey;
 
 - (NSArray<MDKJob*>*)generateJobs
 {
-    return (__bridge_transfer NSArray<MDKJob*>*)CCDriverCreateJobs((__bridge CCDriverRef)self);
+    return (__bridge_transfer NSArray<MDKJob*>*)CCDriverCreateJobs(kCFAllocatorSystemDefault, (__bridge CCDriverRef)self);
 }
 
 - (NSURL*)sysrootURL
