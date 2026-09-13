@@ -115,9 +115,9 @@ int dynamod_mprotect(void *addr,
             @"-sectalign", @"__TEXT", @"__text", @"0x4000",
             @"-dylib",
             @"-o",
-            [[[NSURL fileURLWithPath:NSHomeDirectory()] URLByAppendingPathComponent:@"/Documents/jit.dylib"] path],
-            [[[NSURL fileURLWithPath:NSHomeDirectory()] URLByAppendingPathComponent:@"/Documents/jit.macho"] path],
-        ]];
+        ] withInputFileURLs:@[
+            [[NSURL fileURLWithPath:NSHomeDirectory()] URLByAppendingPathComponent:@"/Documents/jit.macho"],
+        ] withOutputFileURL:[[NSURL fileURLWithPath:NSHomeDirectory()] URLByAppendingPathComponent:@"/Documents/jit.dylib"]];
         
         NSArray<MDKDiagnostic*> *diagnostics;
         if(![job executeJobWithOutDiagnostics:&diagnostics withOutMainSource:nil])

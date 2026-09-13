@@ -53,7 +53,7 @@ CCASTUnitRef CCCompilerJobExecute(CCJobRef job)
     assert(job != nullptr);
     assert(CCJobGetType(job) == kCCJobTypeCompiler);
 
-    CFArrayRef argsArray = CCJobGetArguments(job);
+    CFArrayRef argsArray = CCJobCreateArguments(CFGetAllocator(job), job);
 
     llvm::SmallVector<std::string, 64> argStorage = CCArrayToStringVector(argsArray);
     llvm::SmallVector<const char *, 64> Args = StringVectorToCStrings(argStorage);

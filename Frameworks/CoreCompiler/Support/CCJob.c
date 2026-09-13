@@ -33,7 +33,9 @@ static CFTypeID gCCJobTypeID = _kCFRuntimeNotATypeID;
 struct __CCJob {
     CFRuntimeBase _base;
     CCJobType type;
-    CFArrayRef arguments;
+    CFArrayRef baseArguments;
+    CFArrayRef inputFileURLs;
+    CFURLRef outputFileURL;
 };
 
 static CFTypeRef CCJobCopy(CFAllocatorRef allocator,
@@ -45,9 +47,17 @@ static CFTypeRef CCJobCopy(CFAllocatorRef allocator,
 static void CCJobFinalize(CFTypeRef cf)
 {
     CCJobRef jobRef = (CCJobRef)cf;
-    if(jobRef->arguments != nil)
+    if(jobRef->baseArguments != nil)
     {
-        CFRelease(jobRef->arguments);
+        CFRelease(jobRef->baseArguments);
+    }
+    if(jobRef->outputFileURL != nil)
+    {
+        CFRelease(jobRef->outputFileURL);
+    }
+    if(jobRef->inputFileURLs != nil)
+    {
+        CFRelease(jobRef->inputFileURLs);
     }
 }
 
@@ -77,7 +87,9 @@ CFTypeID CCJobGetTypeID(void)
 
 CCJobRef CCJobCreate(CFAllocatorRef allocator,
                      CCJobType type,
-                     CFArrayRef CC1Arguments)
+                     CFArrayRef CC1Arguments,
+                     CFArrayRef inputFileURLs,
+                     CFURLRef outputFileURL)
 {
     assert(CC1Arguments != nil);
     
@@ -88,7 +100,17 @@ CCJobRef CCJobCreate(CFAllocatorRef allocator,
     }
     
     jobRef->type = type;
-    jobRef->arguments = CFRetain(CC1Arguments);
+    jobRef->baseArguments = CFRetain(CC1Arguments);
+    
+    /* those can be NULL */
+    if(inputFileURLs)
+    {
+        jobRef->inputFileURLs = CFRetain(inputFileURLs);
+    }
+    if(outputFileURL)
+    {
+        jobRef->outputFileURL = CFRetain(outputFileURL);
+    }
     
     return jobRef;
 }
@@ -98,9 +120,57 @@ CCJobType CCJobGetType(CCJobRef job)
     return job->type;
 }
 
-CFArrayRef CCJobGetArguments(CCJobRef job)
+CFArrayRef CCJobGetBaseArguments(CCJobRef job)
 {
-    return job->arguments;
+    return job->baseArguments;
+}
+
+CFArrayRef CCJobGetInputFileURLs(CCJobRef job)
+{
+    return job->inputFileURLs;
+}
+
+CFURLRef CCJobGetOutputFileURL(CCJobRef job)
+{
+    return job->outputFileURL;
+}
+
+CFArrayRef CCJobCreateArguments(CFAllocatorRef allocator,
+                                CCJobRef job)
+{
+    CFMutableArrayRef mutableArguments = CFArrayCreateMutableCopy(allocator, 0, job->baseArguments);
+    if(mutableArguments == NULL)
+    {
+        return NULL;
+    }
+    
+    if(job->outputFileURL != NULL)
+    {
+        CFStringRef path = CFURLCopyFileSystemPath(job->outputFileURL, kCFURLPOSIXPathStyle);
+        if(path != NULL)
+        {
+            CFArrayAppendValue(mutableArguments, CFSTR("-o"));
+            CFArrayAppendValue(mutableArguments, path);
+            CFRelease(path);
+        }
+    }
+    
+    if(job->inputFileURLs != NULL)
+    {
+        CFIndex inputFileURLCount = CFArrayGetCount(job->inputFileURLs);
+        for(CFIndex index = 0; index < inputFileURLCount; index++)
+        {
+            CFURLRef url = CFArrayGetValueAtIndex(job->inputFileURLs, index);
+            CFStringRef path = CFURLCopyFileSystemPath(url, kCFURLPOSIXPathStyle);
+            if(path != NULL)
+            {
+                CFArrayAppendValue(mutableArguments, path);
+                CFRelease(path);
+            }
+        }
+    }
+    
+    return mutableArguments;
 }
 
 CC_EXPORT Boolean CCJobExecuteJob(CCJobRef job,

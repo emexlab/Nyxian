@@ -302,7 +302,7 @@ static void _AppendJob(CFMutableArrayRef out, CFAllocatorRef a,
             _AppendCStr(argsArray, a, arg);
         }
     }
-    CCJobRef jobRef = CCJobCreate(a, type, argsArray);
+    CCJobRef jobRef = CCJobCreate(a, type, argsArray, NULL, NULL);
     CFRelease(argsArray);
     if(jobRef)
     {
@@ -645,7 +645,7 @@ CFArrayRef CCDriverCreateJobs(CFAllocatorRef allocator,
             out_append_swift_job:
                 {
                     
-                    CCJobRef jobRef = CCJobCreate(allocator, type, argsArray);
+                    CCJobRef jobRef = CCJobCreate(allocator, type, argsArray, NULL, NULL);
                     CFRelease(argsArray);
                     if(jobRef)
                     {

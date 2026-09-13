@@ -50,37 +50,37 @@ Boolean CCLinkerJobExecute(CCJobRef job,
     
     assert(job != nullptr);
     assert(CCJobGetType(job) == kCCJobTypeLinker);
-
-    CFArrayRef argsArray = CCJobGetArguments(job);
-
+    
+    CFArrayRef argsArray = CCJobCreateArguments(CFGetAllocator(job), job);
+    
     llvm::SmallVector<std::string, 64> argStorage = CCArrayToStringVector(argsArray);
     llvm::SmallVector<const char *, 64> Args = StringVectorToCStrings(argStorage);
-
+    
     argStorage.push_back("ld64.lld");   /* have to inject */
     Args.insert(Args.begin(), argStorage.back().c_str());
-
+    
     std::string errBuf;
     int retCode;
-
+    
     llvm::CrashRecoveryContext CRC;
     CRC.RunSafely([&]{
         const lld::DriverDef drivers[] = {
             {lld::Darwin, &lld::macho::link},
         };
-
+        
         llvm::raw_string_ostream errStream(errBuf);
-
+        
         lld::Result result = lld::lldMain(Args, errStream, errStream, drivers);
-
+        
         errStream.flush();
         retCode = result.retCode;
-
+        
         lld::CommonLinkerContext::destroy();
     });
     
     CFAllocatorRef allocator = CFGetAllocator(job);
     CFMutableArrayRef result = CFArrayCreateMutable(allocator, 1, &kCFTypeArrayCallBacks);
-
+    
     if(!errBuf.empty())
     {
         if(errBuf.back() == '\n')
@@ -94,7 +94,7 @@ Boolean CCLinkerJobExecute(CCJobRef job,
             os_unfair_lock_unlock(&lock);
             return retCode == 0;
         }
-
+        
         CCDiagnosticLevel level = (retCode == 0) ? kCCDiagnosticLevelWarning : kCCDiagnosticLevelError;
         CFStringRef message = CFStringCreateWithCString(allocator, errBuf.c_str(), kCFStringEncodingUTF8);
         CCDiagnosticRef diagnosticRef = CCDiagnosticCreate(allocator, kCCDiagnosticTypeInternal, level, CFSTR("linker"), nullptr, message);
@@ -112,6 +112,6 @@ Boolean CCLinkerJobExecute(CCJobRef job,
     }
     
     os_unfair_lock_unlock(&lock);
-
+    
     return retCode == 0;
 }

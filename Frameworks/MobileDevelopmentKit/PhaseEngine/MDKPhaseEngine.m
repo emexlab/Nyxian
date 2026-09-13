@@ -34,7 +34,7 @@
 static MDKJob *MDKPhaseGenerationJobByAppendingArgumentsHelper(MDKJob *job,
                                                                NSArray<NSString*> *arguments)
 {
-    return [MDKJob jobWithType:job.type withArguments:[job.arguments arrayByAddingObjectsFromArray:arguments]];
+    return [MDKJob jobWithType:job.type withArguments:[job.baseArguments arrayByAddingObjectsFromArray:arguments] withInputFileURLs:job.inputFileURLs withOutputFileURL:job.outputFileURL];
 }
 
 static void MDKPhaseGenerationEndHelper(MDKPhaseEngine *engine,

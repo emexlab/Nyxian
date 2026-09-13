@@ -32,9 +32,12 @@
 @interface MDKJob : MDKCFType
 
 @property (nonatomic, readonly) CCJobType type;
-@property (nonatomic, readonly) NSArray<NSString*> *arguments;
+@property (nonatomic, readonly) NSArray<NSString*> *baseArguments;
+@property (nonatomic, readonly) NSArray<NSURL*> *inputFileURLs;
+@property (nonatomic, readonly) NSURL *outputFileURL;
+@property (nonatomic, readonly, copy) NSArray<NSString*> *arguments;
 
-+ (instancetype)jobWithType:(CCJobType)type withArguments:(NSArray<NSString*>*)arguments;
++ (instancetype)jobWithType:(CCJobType)type withArguments:(NSArray<NSString*>*)arguments withInputFileURLs:(NSArray<NSURL*>*)inputFileURLs withOutputFileURL:(NSURL*)outputFileURL;
 
 - (BOOL)executeJobWithOutDiagnostics:(NSArray<MDKDiagnostic*>**)outDiagnostic withOutMainSource:(NSString**)outMainSource;
 

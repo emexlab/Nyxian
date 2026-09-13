@@ -33,8 +33,10 @@
 
 + (instancetype)jobWithType:(CCJobType)type
               withArguments:(NSArray<NSString*>*)arguments
+          withInputFileURLs:(NSArray<NSURL *> *)inputFileURLs
+          withOutputFileURL:(NSURL *)outputFileURL
 {
-    return (__bridge_transfer MDKJob*)CCJobCreate(kCFAllocatorSystemDefault, type, (__bridge CFArrayRef)arguments);
+    return (__bridge_transfer MDKJob*)CCJobCreate(kCFAllocatorSystemDefault, type, (__bridge CFArrayRef)arguments, (__bridge CFArrayRef)inputFileURLs, (__bridge CFURLRef)outputFileURL);
 }
 
 - (CCJobType)type
@@ -42,9 +44,24 @@
     return CCJobGetType((__bridge void*)self);
 }
 
+- (NSArray<NSString*>*)baseArguments
+{
+    return (__bridge NSArray<NSString*>*)CCJobGetBaseArguments((__bridge CCJobRef)self);
+}
+
+- (NSArray<NSURL*>*)inputFileURLs
+{
+    return (__bridge NSArray<NSURL*>*)CCJobGetInputFileURLs((__bridge CCJobRef)self);
+}
+
+- (NSURL*)outputFileURL
+{
+    return (__bridge NSURL*)CCJobGetOutputFileURL((__bridge CCJobRef)self);
+}
+
 - (NSArray<NSString*>*)arguments
 {
-    return (__bridge NSArray<NSString*>*)CCJobGetArguments((__bridge void*)self);
+    return (__bridge_transfer NSArray<NSString*>*)CCJobCreateArguments(kCFAllocatorSystemDefault, (__bridge CCJobRef)self);
 }
 
 - (BOOL)executeJobWithOutDiagnostics:(NSArray<MDKDiagnostic*>**)outDiagnostic

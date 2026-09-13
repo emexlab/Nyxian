@@ -112,7 +112,7 @@ CC_EXPORT Boolean CCSwiftCompilerJobExecute(CCJobRef job,
     assert(job != nullptr);
     assert(CCJobGetType(job) == kCCJobTypeSwiftCompiler);
     
-    CFArrayRef argsArray = CCJobGetArguments(job);
+    CFArrayRef argsArray = CCJobCreateArguments(CFGetAllocator(job), job);
     
     llvm::SmallVector<std::string, 64> argStorage = CCArrayToStringVector(argsArray);
     llvm::SmallVector<const char *, 64> args = StringVectorToCStrings(argStorage);
