@@ -148,61 +148,41 @@ static void MDKPhaseGenerationAppendHelper(MDKPhaseEngine *engine,
              withOtherClangFlags:(NSArray<NSString*>*)clangFlags
             withOtherLinkerFlags:(NSArray<NSString*>*)linkerFlags
 {
-    return [[self alloc] initWithDriver:driver withOtherClangFlags:clangFlags withOtherLinkerFlags:linkerFlags];
+    MDKPhaseEngine *phaseEngine = super.alloc.init;
+    if(phaseEngine)
+    {
+        phaseEngine->_otherClangFlags = clangFlags;
+        phaseEngine->_otherLinkerFlags = linkerFlags;
+        phaseEngine->_driver = driver;
+    }
+    return phaseEngine;
 }
 
 + (instancetype)engineWithClangFlags:(NSArray<NSString*>*)clangFlags
                 withOtherLinkerFlags:(NSArray<NSString*>*)linkerFlags
 {
-    return [[self alloc] initWithClangFlags:clangFlags withOtherLinkerFlags:linkerFlags];
+    MDKPhaseEngine *phaseEngine = super.alloc.init;
+    if(phaseEngine)
+    {
+        phaseEngine->_otherClangFlags = clangFlags;
+        phaseEngine->_otherLinkerFlags = linkerFlags;
+        phaseEngine->_driver = [MDKDriver driverWithArguments:clangFlags withType:kCCDriverTypeClang];
+    }
+    return phaseEngine;
 }
 
 + (instancetype)engineWithSwiftFlags:(NSArray<NSString*>*)swiftFlags
                  withOtherClangFlags:(NSArray<NSString*>*)clangFlags
                 withOtherLinkerFlags:(NSArray<NSString*>*)linkerFlags
 {
-    return [[self alloc] initWithSwiftFlags:swiftFlags withOtherClangFlags:clangFlags withOtherLinkerFlags:linkerFlags];
-}
-
-- (instancetype)initWithDriver:(MDKDriver*)driver
-           withOtherClangFlags:(NSArray<NSString*>*)clangFlags
-          withOtherLinkerFlags:(NSArray<NSString*>*)linkerFlags
-{
-    self = [super init];
-    if(self)
+    MDKPhaseEngine *phaseEngine = super.alloc.init;
+    if(phaseEngine)
     {
-        _otherClangFlags = clangFlags;
-        _otherLinkerFlags = linkerFlags;
-        _driver = driver;
+        phaseEngine->_otherClangFlags = clangFlags;
+        phaseEngine->_otherLinkerFlags = linkerFlags;
+        phaseEngine->_driver = [MDKDriver driverWithArguments:swiftFlags withType:kCCDriverTypeSwift];
     }
-    return self;
-}
-
-- (instancetype)initWithClangFlags:(NSArray<NSString*>*)clangFlags
-              withOtherLinkerFlags:(NSArray<NSString*>*)linkerFlags
-{
-    self = [super init];
-    if(self)
-    {
-        _otherClangFlags = clangFlags;
-        _otherLinkerFlags = linkerFlags;
-        _driver = [MDKDriver driverWithArguments:clangFlags withType:kCCDriverTypeClang];
-    }
-    return self;
-}
-
-- (instancetype)initWithSwiftFlags:(NSArray<NSString*>*)swiftFlags
-               withOtherClangFlags:(NSArray<NSString*>*)clangFlags
-              withOtherLinkerFlags:(NSArray<NSString*>*)linkerFlags
-{
-    self = [super init];
-    if(self)
-    {
-        _otherClangFlags = clangFlags;
-        _otherLinkerFlags = linkerFlags;
-        _driver = [MDKDriver driverWithArguments:swiftFlags withType:kCCDriverTypeSwift];
-    }
-    return self;
+    return phaseEngine;
 }
 
 - (id<MDKDriverDelegate>)delegate

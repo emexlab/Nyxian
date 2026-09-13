@@ -33,17 +33,12 @@
 
 + (instancetype)runnerWithEngine:(MDKPhaseEngine*)engine
 {
-    return [[self alloc] initWithEngine:engine];
-}
-
-- (instancetype)initWithEngine:(MDKPhaseEngine*)engine
-{
-    self = [super init];
-    if(self)
+    MDKPhaseRunner *phaseRunner = super.alloc.init;
+    if(phaseRunner)
     {
-        _engine = engine;
+        phaseRunner->_engine = engine;
     }
-    return self;
+    return phaseRunner;
 }
 
 - (BOOL)runJob:(MDKJob*)job withinPhase:(MDKPhase*)phase

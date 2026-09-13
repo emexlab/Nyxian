@@ -27,8 +27,8 @@
 
 @interface NXPhaseEngine : MDKPhaseEngine
 
-- (instancetype _Nullable)initWithProject:(NXProject * _Nonnull)project
-                                    error:(NSError * _Nullable * _Nonnull)error;
++ (instancetype _Nullable)engineWithProject:(NXProject * _Nonnull)project
+                                      error:(NSError * _Nullable * _Nonnull)error;
 
 @end
 

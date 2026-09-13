@@ -37,10 +37,6 @@
 + (instancetype _Nonnull)engineWithClangFlags:(NSArray<NSString*> * _Nonnull)clangFlags withOtherLinkerFlags:(NSArray<NSString*> * _Nonnull)linkerFlags;
 + (instancetype _Nonnull)engineWithSwiftFlags:(NSArray<NSString*> * _Nonnull)swiftFlags withOtherClangFlags:(NSArray<NSString*> * _Nonnull)clangFlags withOtherLinkerFlags:(NSArray<NSString*> * _Nonnull)linkerFlags;
 
-- (instancetype _Nonnull)initWithDriver:(MDKDriver * _Nonnull)driver withOtherClangFlags:(NSArray<NSString*> * _Nonnull)clangFlags withOtherLinkerFlags:(NSArray<NSString*> * _Nonnull)linkerFlags;
-- (instancetype _Nonnull)initWithClangFlags:(NSArray<NSString*> * _Nonnull)clangFlags withOtherLinkerFlags:(NSArray<NSString*> * _Nonnull)linkerFlags;
-- (instancetype _Nonnull)initWithSwiftFlags:(NSArray<NSString*> * _Nonnull)swiftFlags withOtherClangFlags:(NSArray<NSString*> * _Nonnull)clangFlags withOtherLinkerFlags:(NSArray<NSString*> * _Nonnull)linkerFlags;
-
 - (NSArray * _Nullable)generatePhases;
 
 @end

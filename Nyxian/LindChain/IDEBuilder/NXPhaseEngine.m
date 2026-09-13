@@ -25,8 +25,8 @@
 
 @implementation NXPhaseEngine
 
-- (instancetype)initWithProject:(NXProject *)project
-                          error:(NSError **)error
++ (instancetype)engineWithProject:(NXProject *)project
+                            error:(NSError **)error
 {
     /* finding code files */
     NSArray<NSString*> *swiftFiles = LDEFilesFinder(project.url.path, [NSSet setWithArray:@[@"swift"]], [NSSet setWithArray:@[@"Resources",@"Config"]]);
@@ -70,12 +70,12 @@
         [driverFlags addObjectsFromArray:project.projectConfig.swiftFlags];
         [driverFlags addObject:@"-module-name"];
         [driverFlags addObject:NXMakeContentCodeFriendly(project.projectConfig.displayName)];
-        return [super initWithSwiftFlags:driverFlags withOtherClangFlags:project.projectConfig.compilerFlags withOtherLinkerFlags:project.projectConfig.linkerFlags];
+        return [self engineWithSwiftFlags:driverFlags withOtherClangFlags:project.projectConfig.compilerFlags withOtherLinkerFlags:project.projectConfig.linkerFlags];
     }
     else
     {
         [driverFlags addObjectsFromArray:project.projectConfig.compilerFlags];
-        return [super initWithClangFlags:driverFlags withOtherLinkerFlags:project.projectConfig.linkerFlags];
+        return [self engineWithClangFlags:driverFlags withOtherLinkerFlags:project.projectConfig.linkerFlags];
     }
 }
 

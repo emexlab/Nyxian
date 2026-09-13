@@ -45,8 +45,6 @@
 
 + (instancetype _Nullable)runnerWithEngine:(MDKPhaseEngine * _Nonnull)engine;
 
-- (instancetype _Nullable)initWithEngine:(MDKPhaseEngine * _Nonnull)engine;
-
 - (BOOL)runJob:(MDKJob * _Nonnull)job withinPhase:(MDKPhase * _Nonnull)phase;
 - (BOOL)runPhase:(MDKPhase * _Nonnull)phase;
 - (BOOL)runPhasesWithPhases:(NSArray * _Nonnull)phases;
