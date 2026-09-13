@@ -32,6 +32,28 @@ extension NXBuilder: MDKDriverDelegate {
         // Lets make incremental build fast again >=3
         print("[#] JOBS.IN: \(jobs)");
         var newJobs: [MDKJob] = []
+        
+        let userSelectedValue: NSNumber? = UserDefaults.standard.object(forKey: "cputhreads") as? NSNumber
+        let userSelected = userSelectedValue?.intValue ?? CCGetMaximumPerformanceCores()
+        let threads = CFIndex(userSelected == 0 ? 1 : userSelected)
+        
+        let mdkThreadPoolGroup: MDKThreadPoolGroup = MDKThreadPoolGroup(threads: threads)
+        for job in jobs {
+            // Only need the compiler jobs lol
+            if job.type == .compiler,
+               let inputFileURLs = job.inputFileURLs,
+               inputFileURLs.count == 1,    // If it is over 1, tf did it emit
+               let _ = job.outputFileURL {
+                mdkThreadPoolGroup.enter()
+            }
+        }
+        
+        // So we don't get a race condition, the thread safety expert Duy Tran would skip this step ^^
+        //
+        // Duy Tran quote: "MDKThreadPoolGroup only has 8 threads on a 8 core SoC."
+        //
+        var osUnfairLock: os_unfair_lock = .init()
+        
         for job in jobs {
             // Only need the compiler jobs lol
             if job.type == .compiler,
@@ -41,42 +63,53 @@ extension NXBuilder: MDKDriverDelegate {
                 
                 let inputFileURL = inputFileURLs[0]
                 
-                // Checking if the source file is newer than the compiled object file
-                guard let sourceDate = try? FileManager.default.attributesOfItem(atPath: inputFileURL.path)[.modificationDate] as? Date,
-                      let objectDate = try? FileManager.default.attributesOfItem(atPath: outputFileURL.path)[.modificationDate] as? Date,
-                      objectDate > sourceDate else {
-                    self.database.removeFileDebug(ofPath: inputFileURL.path)
-                    newJobs.append(job)
-                    continue
-                }
-                
-                // Checking if the header files included by the source code are newer than the object file
-                let inputFile: MDKFile = MDKFile(url: inputFileURL)
-                guard let headers = self.dependencyScanner.headerFiles(for: inputFile) else {
-                    self.database.removeFileDebug(ofPath: inputFile.fileURL.path)
-                    newJobs.append(job)
-                    continue
-                }
-                
-                var needsRebuild = false
-                for header in headers {
-                    guard let fileURL = header.fileURL,
-                          let headerDate = try? FileManager.default.attributesOfItem(atPath: fileURL.path)[.modificationDate] as? Date,
-                          objectDate > headerDate else {
+                mdkThreadPoolGroup.dispatchExecution({
+                    // Checking if the source file is newer than the compiled object file
+                    guard let sourceDate = try? FileManager.default.attributesOfItem(atPath: inputFileURL.path)[.modificationDate] as? Date,
+                          let objectDate = try? FileManager.default.attributesOfItem(atPath: outputFileURL.path)[.modificationDate] as? Date,
+                          objectDate > sourceDate else {
                         self.database.removeFileDebug(ofPath: inputFileURL.path)
-                        needsRebuild = true
-                        break
+                        os_unfair_lock_lock(&osUnfairLock)
+                        newJobs.append(job)
+                        os_unfair_lock_unlock(&osUnfairLock)
+                        return
                     }
-                }
-                
-                if needsRebuild {
-                    self.database.removeFileDebug(ofPath: inputFileURL.path)
-                    newJobs.append(job)
-                }
+                    
+                    // Checking if the header files included by the source code are newer than the object file
+                    let inputFile: MDKFile = MDKFile(url: inputFileURL)
+                    guard let headers = self.dependencyScanner.headerFiles(for: inputFile) else {
+                        self.database.removeFileDebug(ofPath: inputFile.fileURL.path)
+                        os_unfair_lock_lock(&osUnfairLock)
+                        newJobs.append(job)
+                        os_unfair_lock_unlock(&osUnfairLock)
+                        return
+                    }
+                    
+                    var needsRebuild = false
+                    for header in headers {
+                        guard let fileURL = header.fileURL,
+                              let headerDate = try? FileManager.default.attributesOfItem(atPath: fileURL.path)[.modificationDate] as? Date,
+                              objectDate > headerDate else {
+                            self.database.removeFileDebug(ofPath: inputFileURL.path)
+                            needsRebuild = true
+                            break
+                        }
+                    }
+                    
+                    if needsRebuild {
+                        self.database.removeFileDebug(ofPath: inputFileURL.path)
+                        os_unfair_lock_lock(&osUnfairLock)
+                        newJobs.append(job)
+                        os_unfair_lock_unlock(&osUnfairLock)
+                    }
+                }, withCompletion: nil)
             } else {
                 newJobs.append(job)
             }
         }
+        
+        mdkThreadPoolGroup.wait()
+        
         print("[#] JOBS.OUT: \(newJobs)");
         return newJobs
     }
