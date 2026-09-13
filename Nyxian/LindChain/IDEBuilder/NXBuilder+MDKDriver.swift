@@ -58,14 +58,20 @@ extension NXBuilder: MDKDriverDelegate {
                     continue
                 }
                 
+                var needsRebuild = false
                 for header in headers {
                     guard let fileURL = header.fileURL,
                           let headerDate = try? FileManager.default.attributesOfItem(atPath: fileURL.path)[.modificationDate] as? Date,
                           objectDate > headerDate else {
                         self.database.removeFileDebug(ofPath: inputFileURL.path)
-                        newJobs.append(job)
-                        continue
+                        needsRebuild = true
+                        break
                     }
+                }
+                
+                if needsRebuild {
+                    self.database.removeFileDebug(ofPath: inputFileURL.path)
+                    newJobs.append(job)
                 }
             } else {
                 newJobs.append(job)
