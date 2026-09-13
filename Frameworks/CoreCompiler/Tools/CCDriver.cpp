@@ -153,16 +153,16 @@ CCDriverRef CCDriverCreate(CFAllocatorRef allocator,
                            CCDriverType type)
 {
     assert(arguments != nullptr);
-
+    
     CCDriverRef driverRef = (CCDriverRef)_CFRuntimeCreateInstance(allocator, CCDriverGetTypeID(), sizeof(struct __CCDriver) + sizeof(CFRuntimeBase), NULL);
     if(!driverRef)
     {
         return nullptr;
     }
-
+    
     driverRef->type = type;
     driverRef->argStorage = CCArrayToStringVector(arguments);
-
+    
     if(type == kCCDriverTypeClang)
     {
         driverRef->argStorage.insert(driverRef->argStorage.begin(), "-fuse-ld=lld");
@@ -178,7 +178,7 @@ CCDriverRef CCDriverCreate(CFAllocatorRef allocator,
     {
         driverRef->argPtr.push_back(arg.c_str());
     }
-
+    
     switch(type)
     {
         case kCCDriverTypeClang:
@@ -220,7 +220,7 @@ CCDriverRef CCDriverCreate(CFAllocatorRef allocator,
             CFRelease(driverRef);
             return nullptr;
     }
-
+    
     return driverRef;
 }
 
@@ -291,19 +291,141 @@ static void _AppendCStr(CFMutableArrayRef arr, CFAllocatorRef a, const char *str
     }
 }
 
-static void _AppendJob(CFMutableArrayRef out, CFAllocatorRef a,
-                       CCJobType type, const llvm::opt::ArgStringList &argv)
+static Boolean _IsOptionLike(const char *s)
 {
-    CFMutableArrayRef argsArray = CFArrayCreateMutable(a, argv.size(), &kCFTypeArrayCallBacks);
+    return s && s[0] == '-' && s[1] != '\0';
+}
+
+static void _CollectInputPaths(const clang::driver::Action *A,
+                               llvm::SmallVectorImpl<llvm::StringRef> &out)
+{
+    if(auto *IA = llvm::dyn_cast<clang::driver::InputAction>(A))
+    {
+        out.push_back(IA->getInputArg().getValue());
+        return;
+    }
+    for(const clang::driver::Action *In : A->getInputs())
+    {
+        _CollectInputPaths(In, out);
+    }
+}
+
+static CFURLRef _CreateFileURL(CFAllocatorRef a,
+                               llvm::StringRef path)
+{
+    llvm::SmallString<256> abs(path);
+    if(llvm::sys::fs::make_absolute(abs))
+    {
+        return nullptr;
+    }
+    
+    CFStringRef s = CFStringCreateWithBytes(a, (const UInt8 *)abs.data(), abs.size(), kCFStringEncodingUTF8, false);
+    if(!s)
+    {
+        return nullptr;
+    }
+    CFURLRef u = CFURLCreateWithFileSystemPath(a, s, kCFURLPOSIXPathStyle, false);
+    CFRelease(s);
+    return u;
+}
+
+static void _CopyArgv(CFMutableArrayRef dst,
+                      CFAllocatorRef a,
+                      const llvm::opt::ArgStringList &argv)
+{
     for(const char *arg : argv)
     {
         if(arg)
         {
-            _AppendCStr(argsArray, a, arg);
+            _AppendCStr(dst, a, arg);
         }
     }
-    CCJobRef jobRef = CCJobCreate(a, type, argsArray, NULL, NULL);
-    CFRelease(argsArray);
+}
+
+static void _AppendJob(CFMutableArrayRef out,
+                       CFAllocatorRef a,
+                       CCJobType type,
+                       const clang::driver::Command &Cmd)
+{
+    const llvm::opt::ArgStringList &argv = Cmd.getArguments();
+    
+    CFMutableArrayRef base = nullptr;
+    CFMutableArrayRef inputs = nullptr;
+    CFURLRef outputURL = nullptr;
+    
+    if(type == kCCJobTypeCompiler)
+    {
+        llvm::SmallVector<llvm::StringRef, 4> wanted;
+        _CollectInputPaths(&Cmd.getSource(), wanted);
+        
+        base   = CFArrayCreateMutable(a, argv.size(), &kCFTypeArrayCallBacks);
+        inputs = CFArrayCreateMutable(a, wanted.size(), &kCFTypeArrayCallBacks);
+        
+        const char *outPath = nullptr;
+        size_t stripped = 0;
+        
+        for(size_t i = 0; i < argv.size(); ++i)
+        {
+            const char *arg = argv[i];
+            if(!arg)
+            {
+                continue;
+            }
+            
+            if(llvm::StringRef(arg) == "-o" && i + 1 < argv.size())
+            {
+                outPath = argv[i + 1];
+                ++i;
+                continue;
+            }
+            
+            Boolean positional = (i == 0) || !_IsOptionLike(argv[i - 1]);
+            if(positional && llvm::is_contained(wanted, llvm::StringRef(arg)))
+            {
+                if(CFURLRef u = _CreateFileURL(a, arg))
+                {
+                    CFArrayAppendValue(inputs, u);
+                    CFRelease(u);
+                }
+                stripped++;
+                continue;
+            }
+            
+            _AppendCStr(base, a, arg);
+        }
+        
+        if(outPath)
+        {
+            outputURL = _CreateFileURL(a, outPath);
+        }
+        
+        if(stripped != wanted.size() || !outputURL || CFArrayGetCount(inputs) != (CFIndex)wanted.size())
+        {
+            CFRelease(base);
+            CFRelease(inputs);
+            if(outputURL) { CFRelease(outputURL); }
+            base = nullptr; inputs = nullptr; outputURL = nullptr;
+        }
+    }
+    
+    if(!base)
+    {
+        base = CFArrayCreateMutable(a, argv.size(), &kCFTypeArrayCallBacks);
+        _CopyArgv(base, a, argv);
+    }
+    
+    CCJobRef jobRef = CCJobCreate(a, type, base, inputs, outputURL);
+    
+    CFRelease(base);
+    if(inputs)
+    {
+        CFRelease(inputs);
+    }
+    if(outputURL)
+    {
+        CFRelease(outputURL);
+    }
+    
     if(jobRef)
     {
         CFArrayAppendValue(out, jobRef);
@@ -509,7 +631,7 @@ CFArrayRef CCDriverCreateJobs(CFAllocatorRef allocator,
                 }
                 
                 CCJobType type = _CCJobTypeGetFromClangCommand(&Cmd);
-                _AppendJob(jobsArray, allocator, type, Cmd.getArguments());
+                _AppendJob(jobsArray, allocator, type, Cmd);
             }
             break;
         }
@@ -641,7 +763,7 @@ CFArrayRef CCDriverCreateJobs(CFAllocatorRef allocator,
                     
                     /* TODO: translate some swift flags into clang driver flags */
                 }
-            
+                
             out_append_swift_job:
                 {
                     

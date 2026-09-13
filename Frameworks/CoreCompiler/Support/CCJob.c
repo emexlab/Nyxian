@@ -144,13 +144,23 @@ CFArrayRef CCJobCreateArguments(CFAllocatorRef allocator,
         return NULL;
     }
     
+    CFIndex insert = 0;
+    if(CFArrayGetCount(job->baseArguments) > 0)
+    {
+        CFStringRef first = CFArrayGetValueAtIndex(job->baseArguments, 0);
+        if(CFEqual(first, CFSTR("-cc1")) || CFEqual(first, CFSTR("-cc1as")))
+        {
+            insert = 1;
+        }
+    }
+    
     if(job->outputFileURL != NULL)
     {
         CFStringRef path = CFURLCopyFileSystemPath(job->outputFileURL, kCFURLPOSIXPathStyle);
         if(path != NULL)
         {
-            CFArrayAppendValue(mutableArguments, CFSTR("-o"));
-            CFArrayAppendValue(mutableArguments, path);
+            CFArrayInsertValueAtIndex(mutableArguments, insert, path);
+            CFArrayInsertValueAtIndex(mutableArguments, insert, CFSTR("-o"));
             CFRelease(path);
         }
     }
@@ -164,7 +174,7 @@ CFArrayRef CCJobCreateArguments(CFAllocatorRef allocator,
             CFStringRef path = CFURLCopyFileSystemPath(url, kCFURLPOSIXPathStyle);
             if(path != NULL)
             {
-                CFArrayAppendValue(mutableArguments, path);
+                CFArrayInsertValueAtIndex(mutableArguments, insert, path);
                 CFRelease(path);
             }
         }
