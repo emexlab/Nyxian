@@ -27,41 +27,51 @@ extension NXBuilder: MDKDriverDelegate {
         return "\(self.project.cacheURL.path)/\(NXExpectedObjectFileURLForFileURL(NXRelativeURLFromBaseURLToFullURL(self.project.url, file.fileURL)).path)"
     }
     
-    func driver(_ driver: MDKDriver,
-                skipCompileForInputFile file: MDKFile) -> Bool {
-        if !CCFileTypeIsSwiftFile(file.type),
-           !self.projectDirty {
-            
-            let path: String = file.fileURL.path
-            let objectPath = "\(self.project.cacheURL.path)/\(NXExpectedObjectFileURLForFileURL(NXRelativeURLFromBaseURLToFullURL(self.project.url, file.fileURL)).path)"
-            
-            // Checking if the source file is newer than the compiled object file
-            guard let sourceDate = try? FileManager.default.attributesOfItem(atPath: path)[.modificationDate] as? Date,
-                  let objectDate = try? FileManager.default.attributesOfItem(atPath: objectPath)[.modificationDate] as? Date,
-                  objectDate > sourceDate else {
-                self.database.removeFileDebug(ofPath: file.fileURL.path)
-                return false
-            }
-            
-            // Checking if the header files included by the source code are newer than the object file
-            guard let headers = self.dependencyScanner.headerFiles(for: file) else {
-                self.database.removeFileDebug(ofPath: file.fileURL.path)
-                return false
-            }
-            
-            for header in headers {
-                guard let fileURL = header.fileURL,
-                      let headerDate = try? FileManager.default.attributesOfItem(atPath: fileURL.path)[.modificationDate] as? Date,
-                      objectDate > headerDate else {
-                    self.database.removeFileDebug(ofPath: file.fileURL.path)
-                    return false
+    func driver(_ driver: MDKDriver, editJobListForJobList jobs: [MDKJob]) -> [MDKJob]? {
+        // This can now in theory run in parallel ?:3
+        // Lets make incremental build fast again >=3
+        print("[#] JOBS.IN: \(jobs)");
+        var newJobs: [MDKJob] = []
+        for job in jobs {
+            // Only need the compiler jobs lol
+            if job.type == .compiler,
+               let inputFileURLs = job.inputFileURLs,
+               inputFileURLs.count == 1,    // If it is over 1, tf did it emit
+               let outputFileURL = job.outputFileURL {
+                
+                let inputFileURL = inputFileURLs[0]
+                
+                // Checking if the source file is newer than the compiled object file
+                guard let sourceDate = try? FileManager.default.attributesOfItem(atPath: inputFileURL.path)[.modificationDate] as? Date,
+                      let objectDate = try? FileManager.default.attributesOfItem(atPath: outputFileURL.path)[.modificationDate] as? Date,
+                      objectDate > sourceDate else {
+                    self.database.removeFileDebug(ofPath: inputFileURL.path)
+                    newJobs.append(job)
+                    continue
                 }
+                
+                // Checking if the header files included by the source code are newer than the object file
+                let inputFile: MDKFile = MDKFile(url: inputFileURL)
+                guard let headers = self.dependencyScanner.headerFiles(for: inputFile) else {
+                    self.database.removeFileDebug(ofPath: inputFile.fileURL.path)
+                    newJobs.append(job)
+                    continue
+                }
+                
+                for header in headers {
+                    guard let fileURL = header.fileURL,
+                          let headerDate = try? FileManager.default.attributesOfItem(atPath: fileURL.path)[.modificationDate] as? Date,
+                          objectDate > headerDate else {
+                        self.database.removeFileDebug(ofPath: inputFileURL.path)
+                        newJobs.append(job)
+                        continue
+                    }
+                }
+            } else {
+                newJobs.append(job)
             }
-            
-            return true
-        } else {
-            self.database.removeFileDebug(ofPath: file.fileURL.path)
-            return false
         }
+        print("[#] JOBS.OUT: \(newJobs)");
+        return newJobs
     }
 }
