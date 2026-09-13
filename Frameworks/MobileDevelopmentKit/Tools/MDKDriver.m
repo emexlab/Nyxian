@@ -79,7 +79,23 @@ static const void *MDKDriverDelegateKey = &MDKDriverDelegateKey;
 
 - (NSArray<MDKJob*>*)generateJobs
 {
-    return (__bridge_transfer NSArray<MDKJob*>*)CCDriverCreateJobs(kCFAllocatorSystemDefault, (__bridge CCDriverRef)self);
+    NSArray<MDKJob*> *jobs = (__bridge_transfer NSArray<MDKJob*>*)CCDriverCreateJobs(kCFAllocatorSystemDefault, (__bridge CCDriverRef)self);
+    if(jobs == nil)
+    {
+        return nil;
+    }
+    
+    MDKWeakWrapper *wrapper = objc_getAssociatedObject(self, MDKDriverDelegateKey);
+    if([wrapper.delegate respondsToSelector:@selector(driver:editJobListForJobList:)])
+    {
+        jobs = [wrapper.delegate driver:self editJobListForJobList:jobs];
+        if(jobs == nil)
+        {
+            return nil;
+        }
+    }
+    
+    return jobs;
 }
 
 - (NSURL*)sysrootURL

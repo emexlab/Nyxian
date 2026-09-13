@@ -38,6 +38,7 @@
 @optional
 - (NSString * _Nullable)driver:(MDKDriver * _Nonnull)driver outputPathForInputFile:(MDKFile * _Nonnull)file;
 - (BOOL)driver:(MDKDriver * _Nonnull)driver skipCompileForInputFile:(MDKFile * _Nonnull)file;
+- (NSArray<MDKJob*> *_Nullable)driver:(MDKDriver * _Nonnull)driver editJobListForJobList:(NSArray<MDKJob*>* _Nonnull)jobs;
 @end
 
 @interface MDKDriver : MDKCFType
