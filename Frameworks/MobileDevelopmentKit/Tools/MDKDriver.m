@@ -108,6 +108,11 @@ static const void *MDKDriverDelegateKey = &MDKDriverDelegateKey;
     return (__bridge_transfer MDKSDK*)CCDriverCopySDK((__bridge CCDriverRef)self);
 }
 
+- (CCDriverType)type
+{
+    return CCDriverGetType((__bridge CCDriverRef)self);
+}
+
 - (void)setDelegate:(id<MDKDriverDelegate>)delegate
 {
     MDKWeakWrapper *wrapper = nil;

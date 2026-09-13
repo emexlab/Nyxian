@@ -28,6 +28,10 @@ extension NXBuilder: MDKDriverDelegate {
     }
     
     func driver(_ driver: MDKDriver, editJobListForJobList jobs: [MDKJob]) -> [MDKJob]? {
+        if driver.type != .clang {
+            return jobs
+        }
+        
         // This can now in theory run in parallel ?:3
         // Lets make incremental build fast again >=3
         print("[#] JOBS.IN: \(jobs)");
@@ -103,12 +107,22 @@ extension NXBuilder: MDKDriverDelegate {
                         os_unfair_lock_unlock(&osUnfairLock)
                     }
                 }, withCompletion: nil)
-            } else {
-                newJobs.append(job)
             }
         }
         
         mdkThreadPoolGroup.wait()
+        
+        for job in jobs {
+            // Only need the compiler jobs lol
+            if job.type == .compiler,
+               let inputFileURLs = job.inputFileURLs,
+               inputFileURLs.count == 1,    // If it is over 1, tf did it emit
+               let _ = job.outputFileURL {
+            } else {
+                // Not a hack, usually this can only be a linker job
+                newJobs.append(job)
+            }
+        }
         
         print("[#] JOBS.OUT: \(newJobs)");
         return newJobs

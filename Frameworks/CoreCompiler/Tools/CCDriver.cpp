@@ -224,6 +224,11 @@ CCDriverRef CCDriverCreate(CFAllocatorRef allocator,
     return driverRef;
 }
 
+CCDriverType CCDriverGetType(CCDriverRef driver)
+{
+    return driver->type;
+}
+
 static CCJobType _CCJobTypeGetFromClangCommand(const clang::driver::Command *Cmd)
 {
     const clang::driver::Action &source = Cmd->getSource();

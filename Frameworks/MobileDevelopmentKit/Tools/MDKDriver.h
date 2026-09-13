@@ -45,6 +45,7 @@
 
 @property (nonatomic, readonly, copy, nullable) NSURL *sysrootURL;
 @property (nonatomic, readonly, copy, nullable) MDKSDK *sdk;
+@property (nonatomic, readonly) CCDriverType type;
 
 @property (nonatomic, readwrite, weak) id<MDKDriverDelegate> delegate;
 
