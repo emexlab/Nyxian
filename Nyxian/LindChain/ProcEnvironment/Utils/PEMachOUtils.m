@@ -26,6 +26,8 @@
 #import <mach-o/ldsyms.h>
 #import <assert.h>
 
+extern const struct mach_header *_dyld_get_dlopen_image_header(void *handle);
+
 void *PEGetMachOEntryPointOfHeader(void *handle)
 {
     const struct mach_header_64 *header = (struct mach_header_64 *)_dyld_get_dlopen_image_header(handle);
