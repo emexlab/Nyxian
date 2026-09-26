@@ -136,6 +136,8 @@ int vnode_inaccessible_open(const char *path,
         return -1;
     }
     
+    chmod(inaccessible_path, 0777);
+    
     /* now open the inaccessible fd */
     int inaccessible_fd = open(inaccessible_path, flg);
     close(fd);
