@@ -35,6 +35,7 @@
 #include <mach/vm_region.h>
 #include <mach/vm_statistics.h>
 #include <pthread.h>
+#include <sched.h>
 #include <signal.h>
 #include <spawn.h>
 #include <stdarg.h>

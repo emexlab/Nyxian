@@ -64,11 +64,6 @@
 	<true/>
 	<key>SBAppUsesLocalNotifications</key>
 	<integer>1</integer>
-	<key>UIAppFonts</key>
-	<array>
-		<string>Inconsolata-Regular.ttf</string>
-		<string>Inconsolata-Bold.ttf</string>
-	</array>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>

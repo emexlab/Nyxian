@@ -23,6 +23,7 @@
 #include <sys/ucred.h>
 #include <sys/mount.h>
 #include <LiveShim/shim.h>
+#include <LiveShim/vroot.h>
 #include <Broadpatch/Broadpatch.h>
 
 static void fill_fake(struct statfs *f)
@@ -40,7 +41,7 @@ static void fill_fake(struct statfs *f)
     f->f_owner = 0;
     f->f_flags = MNT_LOCAL | MNT_ROOTFS;
     strlcpy(f->f_fstypename, "apfs", sizeof(f->f_fstypename));
-    strlcpy(f->f_mntonname, getenv("NXROOT"), sizeof(f->f_mntonname));
+    strlcpy(f->f_mntonname, liveshim_vroot(), sizeof(f->f_mntonname));
     strlcpy(f->f_mntfromname, "nyxian", sizeof(f->f_mntfromname));
 }
 

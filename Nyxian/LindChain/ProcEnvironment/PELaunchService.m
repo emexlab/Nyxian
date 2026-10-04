@@ -127,8 +127,13 @@
 #if DEBUG && KSURFACE_KLOG_ENABLE_DAEMONS
     extern int kfd;
     PEFileTable *fileTable = [PEFileTable emptyTable];
+#if KSURFACE_PROCESSLOGGING_REDIRECT_STD
+    [fileTable appendFileDescriptor:STDOUT_FILENO withMappingToLoc:STDOUT_FILENO];
+    [fileTable appendFileDescriptor:STDERR_FILENO withMappingToLoc:STDERR_FILENO];
+#else
     [fileTable appendFileDescriptor:kfd withMappingToLoc:STDOUT_FILENO];
     [fileTable appendFileDescriptor:kfd withMappingToLoc:STDERR_FILENO];
+#endif /* KSURFACE_PROCESSLOGGING_REDIRECT_STD */
     mutable[@"PEFileTable"] = fileTable;
 #endif /* DEBUG && KSURFACE_KLOG_ENABLE_DAEMONS */
     items = [mutable copy];

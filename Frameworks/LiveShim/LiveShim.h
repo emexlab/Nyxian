@@ -27,6 +27,7 @@
 #include <LiveShim/LiveShimSyscall.h>
 #include <LiveShim/dyld.h>
 #include <LiveShim/patchcache.h>
+#include <LiveShim/vroot.h>
 #import <LiveShim/Service.h>
 #import <LiveShim/ServiceProtocol.h>
 

@@ -398,6 +398,7 @@
 				LindChain/ProcEnvironment/Surface/sys/compat/pectl.m,
 				LindChain/ProcEnvironment/Surface/sys/compat/sign.m,
 				LindChain/ProcEnvironment/Surface/sys/compat/task_for_pid.c,
+				LindChain/ProcEnvironment/Surface/sys/compat/vroot.c,
 				LindChain/ProcEnvironment/Surface/sys/compat/waittask.c,
 				LindChain/ProcEnvironment/Surface/sys/cred/getgid.c,
 				LindChain/ProcEnvironment/Surface/sys/cred/getppid.c,
@@ -673,6 +674,7 @@
 				LindChain/ProcEnvironment/Surface/sys/compat/pectl.m,
 				LindChain/ProcEnvironment/Surface/sys/compat/sign.m,
 				LindChain/ProcEnvironment/Surface/sys/compat/task_for_pid.c,
+				LindChain/ProcEnvironment/Surface/sys/compat/vroot.c,
 				LindChain/ProcEnvironment/Surface/sys/compat/waittask.c,
 				LindChain/ProcEnvironment/Surface/sys/cred/getgid.c,
 				LindChain/ProcEnvironment/Surface/sys/cred/getppid.c,
@@ -885,6 +887,8 @@
 				LiveShim/shims/sysctl.c,
 				LiveShim/shims/task.c,
 				LiveShim/shims/ucred.c,
+				LiveShim/vroot.c,
+				LiveShim/vroot.h,
 			);
 			privateHeaders = (
 				LiveShim/mach/fileport.h,
@@ -899,6 +903,7 @@
 				LiveShim/ServiceKit/ServiceProtocol.h,
 				LiveShim/shims/dyld.h,
 				LiveShim/shims/patchcache.h,
+				LiveShim/vroot.h,
 			);
 			target = 8FB3BADA302FFBAA00DB3ABC /* LiveShim */;
 		};

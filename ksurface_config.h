@@ -48,6 +48,8 @@
 #define KSURFACE_KLOG_ENABLE_DAEMONS            0
 #define KSURFACE_KLOG_ENABLE_PROCESSES          0
 
+#define KSURFACE_PROCESSLOGGING_REDIRECT_STD    0
+
 /* kernel extension features */
 #define KSURFACE_KEXT_HARDENED_LOADING          0   /* crash on failed loads */
 #define KSURFACE_KEXT_ALLOW_CONSTRUCTORS        0   /* allows that kext link editor runs __attribute__((constructor)) in kexts */

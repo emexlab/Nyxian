@@ -20,6 +20,7 @@
 */
 
 #include <LiveShim/patchcache.h>
+#include <LiveShim/vroot.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
@@ -42,7 +43,7 @@ bool ksurface_user_patchcache_load(void)
         return true;
     }
     
-    char *rootPath = getenv("NXROOT");
+    const char *rootPath = liveshim_vroot();
     if(!rootPath)
     {
         os_unfair_lock_unlock(&g_lock);

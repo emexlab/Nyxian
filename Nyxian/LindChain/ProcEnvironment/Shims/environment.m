@@ -24,9 +24,11 @@
 #import <LindChain/ProcEnvironment/Surface/libkern/task_handoff.h>
 #import <LindChain/ProcEnvironment/LiveContainer/LCBootstrap.h>
 #import <LiveShim/LiveShimSyscall.h>
+#import <LiveShim/vroot.h>
 #import <LindChain/Utils/CFTools.h>
 #import <ksurface_config.h>
 #import <dlfcn.h>
+#import <sys/resource.h>
 
 #if !HOST_ENV
 
@@ -134,15 +136,31 @@ int environment_init(EnvironmentExec exec,
     static dispatch_once_t onceToken;
     dispatch_once(&onceToken, ^{
         /*
-         * since this is not XNU spawning the process
-         * directly for us using fork() + exec() the
-         * executable path will be off, so we'll have
-         * to overwrite it our selves, basically its
-         * a puppet theater show where we present what
-         * the executable it self and other executables
-         * expect of the values to be.
+         * iOS usually only allows us to have 200~ ish
+         * files opened, we need to bypass that by raising
+         * the rlimit.
          */
-        PEOverwriteExecutablePath(executablePath);
+        {
+            struct rlimit rl;
+            if(getrlimit(RLIMIT_NOFILE, &rl) == 0)
+            {
+                rlim_t target = (rl.rlim_max == RLIM_INFINITY || rl.rlim_max > 65536) ? 65536 : rl.rlim_max;
+                if(rl.rlim_cur < target)
+                {
+                    struct rlimit want = rl;
+                    want.rlim_cur = target;
+                    if(setrlimit(RLIMIT_NOFILE, &want) != 0)
+                    {
+                        want.rlim_cur = 10240;
+                        if(want.rlim_max != RLIM_INFINITY && want.rlim_max < want.rlim_cur)
+                        {
+                            want.rlim_cur = want.rlim_max;
+                        }
+                        setrlimit(RLIMIT_NOFILE, &want);
+                    }
+                }
+            }
+        }
         
         /*
          * initializing subsystems of the guest, basically
@@ -170,8 +188,19 @@ int environment_init(EnvironmentExec exec,
         /* handoffs task port */
         task_handoff(MACH_PORT_NULL, NULL);
         
-        /* checking for shimcache */
-        NSString *nyxianRoot = [NSString stringWithCString:getenv("NXROOT") encoding:NSUTF8StringEncoding];
+        /*
+         * since this is not XNU spawning the process
+         * directly for us using fork() + exec() the
+         * executable path will be off, so we'll have
+         * to overwrite it our selves, basically its
+         * a puppet theater show where we present what
+         * the executable it self and other executables
+         * expect of the values to be.
+         */
+        PEOverwriteExecutablePath(executablePath);
+        
+        /* loading rtpatch into guest process */
+        NSString *nyxianRoot = [NSString stringWithCString:liveshim_vroot() encoding:NSUTF8StringEncoding];
         if(nyxianRoot != NULL)
         {
             NSString *shimPath = [nyxianRoot stringByAppendingString:@"/boot/rtpatch"];

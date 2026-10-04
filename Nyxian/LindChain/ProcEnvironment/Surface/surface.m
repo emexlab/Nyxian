@@ -38,6 +38,7 @@ syscall_list_item_t sys_list[] = {
     { .name = "SYS_pectl",          .sysnum = SYS_pectl,        .hndl = GET_SYSCALL_HANDLER(pectl)          },
     { .name = "sys_getppid",        .sysnum = SYS_getppid,      .hndl = GET_SYSCALL_HANDLER(getppid)        },
     { .name = "SYS_openpty",        .sysnum = SYS_openpty,      .hndl = GET_SYSCALL_HANDLER(openpty)        },
+    { .name = "SYS_vroot",          .sysnum = SYS_vroot,        .hndl = GET_SYSCALL_HANDLER(vroot)          },
     
 #if KSURFACE_SYS_IOCTL_ENABLED
     { .name = "SYS_ioctl",          .sysnum = SYS_ioctl,        .hndl = GET_SYSCALL_HANDLER(ioctl)          },

@@ -19,11 +19,9 @@
  along with Nyxian. If not, see <https://www.gnu.org/licenses/>.
 */
 
-#ifndef SURFACE_SYS_VROOT_H
-#define SURFACE_SYS_VROOT_H
+#ifndef LIVESHIM_VROOT_H
+#define LIVESHIM_VROOT_H
 
-#include <LindChain/ProcEnvironment/Surface/surface.h>
+const char *liveshim_vroot(void);
 
-DEFINE_SYSCALL_HANDLER(vroot);
-
-#endif /* SURFACE_SYS_VROOT_H */
+#endif /* LIVESHIM_VROOT_H */

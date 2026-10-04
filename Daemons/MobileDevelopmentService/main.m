@@ -23,6 +23,7 @@
 #import <MobileDevelopmentKit/MobileDevelopmentKit.h>
 #import <LiveShim/Service.h>
 #import <LiveShim/ServiceProtocol.h>
+#import <LiveShim/vroot.h>
 
 static NSString *ubid = nil;
 static MDKDependencyScanner *dependencyScanner = nil;
@@ -122,7 +123,7 @@ int main(int argc, char **argv)
     }
     
     /* getting nxroot */
-    const char *virtualRootPathCStr = getenv("NXROOT");
+    const char *virtualRootPathCStr = liveshim_vroot();
     if(virtualRootPathCStr == NULL)
     {
         return 1;

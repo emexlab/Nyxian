@@ -23,13 +23,9 @@
 #import <LindChain/ProcEnvironment/LiveContainer/LCUtils.h>
 #import <LindChain/ProcEnvironment/LiveContainer/LCMachOUtils.h>
 #import <LindChain/ProcEnvironment/Utils/vnode.h>
+#import <LindChain/Private/mach/mach_vm.h>
 
 #if DEBUG
-
-extern kern_return_t mach_vm_remap(vm_map_t target_task, mach_vm_address_t *target_address, mach_vm_size_t size, mach_vm_offset_t mask, int flags, vm_map_t src_task, mach_vm_address_t src_address, boolean_t copy, vm_prot_t *cur_protection, vm_prot_t *max_protection, vm_inherit_t inheritance);
-extern kern_return_t mach_vm_allocate(vm_map_t target_task, mach_vm_address_t *address, mach_vm_size_t size, int flags);
-extern kern_return_t mach_vm_deallocate(vm_map_t target_task, mach_vm_address_t address, mach_vm_size_t size);
-extern kern_return_t mach_vm_protect(vm_map_t target_task, mach_vm_address_t address, mach_vm_size_t size, boolean_t set_maximum, vm_prot_t new_protection);
 
 static kern_return_t mach_vm_replace_cs_range_with_anon_rw(mach_vm_address_t addr,
                                                            mach_vm_size_t len)
@@ -114,7 +110,6 @@ int dynamod_mprotect(void *addr,
             @"18.0",
             @"-sectalign", @"__TEXT", @"__text", @"0x4000",
             @"-dylib",
-            @"-o",
         ] withInputFileURLs:@[
             [[NSURL fileURLWithPath:NSHomeDirectory()] URLByAppendingPathComponent:@"/Documents/jit.macho"],
         ] withOutputFileURL:[[NSURL fileURLWithPath:NSHomeDirectory()] URLByAppendingPathComponent:@"/Documents/jit.dylib"]];

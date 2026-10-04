@@ -34,6 +34,7 @@
 #include <LindChain/ProcEnvironment/Surface/sys/compat/waittask.h>
 #include <LindChain/ProcEnvironment/Surface/sys/compat/pectl.h>
 #include <LindChain/ProcEnvironment/Surface/sys/compat/sign.h>
+#include <LindChain/ProcEnvironment/Surface/sys/compat/vroot.h>
 #include <LindChain/ProcEnvironment/Surface/sys/cred/setuid.h>
 #include <LindChain/ProcEnvironment/Surface/sys/cred/setgid.h>
 #include <LindChain/ProcEnvironment/Surface/sys/cred/getppid.h>

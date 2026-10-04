@@ -144,7 +144,7 @@ int LCBootstrapMain(NSString *executablePath,
     }
     
     /* find main */
-    int (*guestMain)(int, char**, char **, const char *) = PEGetMachOEntryPointOfHeader(guestHandle);
+    int (*guestMain)(int, char**, char **, const char *) = PEGetMachOEntryPointOfHeader(guestHandle)?: dlsym(guestHandle, "main");
     assert(guestHandle != NULL);
     
     /*
@@ -176,4 +176,3 @@ int LCBootstrapMain(NSString *executablePath,
     extern char **environ;
     return guestMain(argc, argv, environ, executablePath.fileSystemRepresentation);
 }
-
