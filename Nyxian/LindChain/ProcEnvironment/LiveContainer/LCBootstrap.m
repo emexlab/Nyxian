@@ -144,7 +144,7 @@ int LCBootstrapMain(NSString *executablePath,
     }
     
     /* find main */
-    int (*entry)(int, char**) = PEGetMachOEntryPointOfHeader(guestHandle)?: dlsym(guestHandle, "main");
+    int (*entry)(int, char**, char **, const char *) = PEGetMachOEntryPointOfHeader(guestHandle)?: dlsym(guestHandle, "main");
     if(entry == NULL)
     {
         fprintf(stderr, "failed to find entry in executable\n");
@@ -177,5 +177,7 @@ int LCBootstrapMain(NSString *executablePath,
         DyldHooksInit();
     }
     
-    return entry(argc, argv);
+    extern char **environ;
+    return entry(argc, argv, environ, executablePath.fileSystemRepresentation);
 }
+
