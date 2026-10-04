@@ -55,6 +55,7 @@
 #define SYS_openpty         762 /* opens new pseudo terminal */
 #define SYS_loginctl        763 /* process login-name control */
 #define SYS_groupctl        764 /* supplementary group control */
+#define SYS_vroot           765 /* tells guests where Nyxian's root lives at */
 
 typedef CF_ENUM(UInt16, PELoginCTLAction) {
     kPELoginCTLGetLength = 0,
