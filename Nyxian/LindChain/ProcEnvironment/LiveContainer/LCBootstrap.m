@@ -144,12 +144,8 @@ int LCBootstrapMain(NSString *executablePath,
     }
     
     /* find main */
-    int (*entry)(int, char**, char **, const char *) = PEGetMachOEntryPointOfHeader(guestHandle)?: dlsym(guestHandle, "main");
-    if(entry == NULL)
-    {
-        fprintf(stderr, "failed to find entry in executable\n");
-        return 1;
-    }
+    int (*guestMain)(int, char**, char **, const char *) = PEGetMachOEntryPointOfHeader(guestHandle);
+    assert(guestHandle != NULL);
     
     /*
      * now we load the executable of the bundle, as it doesn't
@@ -178,6 +174,6 @@ int LCBootstrapMain(NSString *executablePath,
     }
     
     extern char **environ;
-    return entry(argc, argv, environ, executablePath.fileSystemRepresentation);
+    return guestMain(argc, argv, environ, executablePath.fileSystemRepresentation);
 }
 
