@@ -91,6 +91,7 @@ void syscall_send_reply(mach_msg_header_t *request,
      */
     reply.header.msgh_bits = MACH_MSGH_BITS_REMOTE(MACH_MSG_TYPE_MOVE_SEND_ONCE);
     reply.header.msgh_remote_port = request->msgh_remote_port;
+    request->msgh_remote_port = MACH_PORT_NULL; /* preventing double free */
     reply.header.msgh_size = sizeof(reply);
     reply.header.msgh_id = request->msgh_id + 100;
     reply.result = result;

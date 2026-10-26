@@ -138,7 +138,7 @@
 - (void)setSnapshot:(UIImage*)image
 {
     /* null pointer check */
-    if(image == NULL)
+    if(image == nil)
     {
         return;
     }
