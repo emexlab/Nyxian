@@ -406,6 +406,7 @@ DEFINE_SYSCALL_HANDLER(pectl_userinterface)
                 if(pid < 0)
                 {
                     syscall_send_reply(&(recv->header), -1, NULL, 0, true, EAGAIN);
+                    return;
                 }
                 
                 syscall_send_reply(&(recv->header), 0, NULL, 0, true, 0);
