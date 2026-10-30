@@ -162,17 +162,8 @@ kern_return_t ksurface_fs_mount2(FSMountAttr attributes,
     /* shall this be cleared? */
     if(attributes & kFSMountAttrClear)
     {
-        switch(type)
-        {
-            case kFSNodeTypeDirectory:
-                __ksurface_fs_mount_clear_directory(mount_dir);
-                break;
-            case kFSNodeTypeSymbolicLink:
-                __ksurface_fs_mount_clear_directory(device_dir);
-                break;
-            default:
-                return KERN_FAILURE;
-        }
+        /* doesn't really matter much what this returns */
+        __ksurface_fs_mount_clear_directory(type == kFSNodeTypeDirectory ? mount_dir : device_dir);
     }
     
     /* preparing node */

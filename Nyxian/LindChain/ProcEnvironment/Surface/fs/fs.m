@@ -47,7 +47,7 @@ static void ksurface_fs_init_mount3(FSMountAttr attributes,
 {
     if(ksurface_fs_mount3(attributes, device_dir, mount_dir) != KERN_SUCCESS)
     {
-        kpanic("failed to create %s usersoace mount", mount_dir);
+        kpanic("failed to create %s userspace mount", mount_dir);
     }
 }
 
