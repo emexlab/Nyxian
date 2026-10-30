@@ -33,20 +33,20 @@ typedef CF_OPTIONS(UInt64, FSMountAttr) {
     kFSMountAttrRead                    = 1ull << 0,    /* grants read access in file system sandbox */
     kFSMountAttrWrite                   = 1ull << 1,    /* grants write access in file system sandbox MARK: kFSMountAttrRead is required for this, otherwise will error with KERN_INVALID_ARGUMENT */
     kFSMountAttrClear                   = 1ull << 2,    /* clears the mount_dir or bind_dir if passed */
-    kFSMountAttrReadPlatform            = 1ull << 3,    /* grants read access in file system sandbox if it is a platform process        TODO: not supported yet */
-    kFSMountAttrWritePlatform           = 1ull << 4,    /* grants write access in file system sandbox if it is a platform process       TODO: not supported yet */
+    kFSMountAttrReadPlatform            = 1ull << 3,    /* grants read access in file system sandbox if it is a platform process */
+    kFSMountAttrWritePlatform           = 1ull << 4,    /* grants write access in file system sandbox if it is a platform process */
     kFSMountAttrReadEntitlement         = 1ull << 5,    /* grants read access in file system sandbox if a specific entitlement is met   TODO: not supported yet */
     kFSMountAttrWriteEntitlement        = 1ull << 6,    /* grants write access in file system sandbox if a specific entitlement is met  TODO: not supported yet */
 };
 
-extern const char *FS_MOUNT_SANDBOX;
-extern const char *FS_MOUNT_NOUNLINK;
+extern const char FS_MOUNT_SANDBOX[PATH_MAX];
+extern const char FS_MOUNT_NOUNLINK[PATH_MAX];
 
 /* TODO: not supported yet */
 typedef struct {
     CFStringRef readEntitlement;
     CFStringRef writeEntitlement;
-} kFSMountAttrEntitlementDefinition;
+} FSMountAttrEntitlementDefinition;
 
 kern_return_t ksurface_fs_mount(FSMountAttr attributes, const char *mount_dir, const char *bind_dir, ...) __attribute__((deprecated("Use ksurface_fs_mount2(3) instead")));
 kern_return_t ksurface_fs_mount2(FSMountAttr attributes, const char *device_dir, const char *mount_dir, ...);

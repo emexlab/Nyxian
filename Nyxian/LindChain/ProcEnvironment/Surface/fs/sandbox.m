@@ -23,6 +23,7 @@
 #import <Foundation/Foundation.h>
 #include <LindChain/ProcEnvironment/Surface/libkern/klog.h>
 #include <LindChain/ProcEnvironment/Surface/libkern/sandbox.h>
+#include <LindChain/ProcEnvironment/Surface/libkern/patch.h>
 #include <LindChain/ProcEnvironment/Surface/fs/sandbox.h>
 #include <os/lock.h>
 
@@ -33,8 +34,13 @@
 #define FS_PERM_MIN(a, b) (((a) < (b)) ? (a) : (b))
 
 typedef struct {
+    /* properties */
     FSMountPermissionFlags permission;
     FSNodeType type;
+    CFStringRef entitlementNeededRead;
+    CFStringRef entitlementNeededWrite;
+    
+    /* identitiy */
     char decl[PATH_MAX];
     char bind[PATH_MAX];
     char site[PATH_MAX];
@@ -135,10 +141,12 @@ static bool fs_issuable(const char *phys)
     return (g_home[0] && fs_contains(g_home, phys));
 }
 
-kern_return_t ksurface_fs_sandbox_registry_add(FSMountPermissionFlags permission,
-                                               FSNodeType type,
-                                               const char *mount_dir,
-                                               const char *bind_dir)
+LIBKERN_DEFINE_PATCHABLE(kern_return_t, ksurface_fs_sandbox_registry_add, (FSMountPermissionFlags permission,
+                                                                           FSNodeType type,
+                                                                           const char *mount_dir,
+                                                                           const char *bind_dir,
+                                                                           CFStringRef entitlementNeededRead,
+                                                                           CFStringRef entitlementNeededWrite))
 {
     if(mount_dir == NULL)
     {
@@ -164,6 +172,14 @@ kern_return_t ksurface_fs_sandbox_registry_add(FSMountPermissionFlags permission
     memset(r, 0, sizeof(*r));
     r->permission = permission;
     r->type = type;
+    if(entitlementNeededRead != NULL)
+    {
+        r->entitlementNeededRead = CFRetain(entitlementNeededRead);
+    }
+    if(entitlementNeededWrite != NULL)
+    {
+        r->entitlementNeededWrite = CFRetain(entitlementNeededWrite);
+    }
     strlcpy(r->decl, mount_dir, PATH_MAX);
     if(bind_dir != NULL)
     {
@@ -221,7 +237,7 @@ static void fs_seal_record(FSMountRecord *r,
     }
 }
 
-kern_return_t ksurface_fs_sandbox_registry_remove(const char *path)
+LIBKERN_DEFINE_PATCHABLE(kern_return_t, ksurface_fs_sandbox_registry_remove, (const char *path))
 {
     if(path == NULL)
     {
@@ -250,6 +266,15 @@ kern_return_t ksurface_fs_sandbox_registry_remove(const char *path)
     {
         os_unfair_lock_unlock(&g_lock);
         return KERN_INVALID_NAME;
+    }
+    
+    if(g_records[victim].entitlementNeededRead != NULL)
+    {
+        CFRelease(g_records[victim].entitlementNeededRead);
+    }
+    if(g_records[victim].entitlementNeededWrite != NULL)
+    {
+        CFRelease(g_records[victim].entitlementNeededWrite);
     }
     
     memmove(&g_records[victim], &g_records[victim + 1], (g_record_count - (size_t)victim - 1) * sizeof(FSMountRecord));
@@ -352,8 +377,9 @@ static FSMountPermissionFlags fs_backing_permission(const char *phys)
     return best;
 }
 
-CFArrayRef ksurface_fs_sandbox_copy_sandbox_extensions(const char *path,
-                                                       FSMountPermissionFlags wanted)
+LIBKERN_DEFINE_PATCHABLE(CFArrayRef, ksurface_fs_sandbox_copy_sandbox_extensions_for_entitlements, (const char *path,
+                                                                                                    FSMountPermissionFlags wanted,
+                                                                                                    CFDictionaryRef entitlements))
 {
     if(path == NULL || path[0] != '/')
     {
@@ -422,6 +448,25 @@ CFArrayRef ksurface_fs_sandbox_copy_sandbox_extensions(const char *path,
             }
             
             FSMountPermissionFlags perm = FS_PERM_MIN(wanted, r->permission);
+            
+            if(entitlements != NULL)
+            {
+                if(r->entitlementNeededRead != NULL && CFDictionaryGetValue(entitlements, r->entitlementNeededRead) != kCFBooleanTrue)
+                {
+                    continue;
+                }
+                
+                /* write only doesnt work yet lol*/
+                if(r->entitlementNeededWrite != NULL && CFDictionaryGetValue(entitlements, r->entitlementNeededWrite) != kCFBooleanTrue)
+                {
+                    perm = FS_PERM_MIN(perm, kFSMountPermissionRead);
+                }
+            }
+            
+            if(perm == kFSMountPermissionNone)
+            {
+                continue;
+            }
             
             if(r->type == kFSNodeTypeSymbolicLink)
             {
@@ -493,8 +538,14 @@ CFArrayRef ksurface_fs_sandbox_copy_sandbox_extensions(const char *path,
     return sandboxFileExtensions;
 }
 
-CFDataRef ksurface_fs_sandbox_copy_sandbox_extension_for_arbitary_path(const char *path,
-                                                                       FSMountPermissionFlags wanted)
+LIBKERN_DEFINE_PATCHABLE(CFArrayRef, ksurface_fs_sandbox_copy_sandbox_extensions, (const char *path,
+                                                                                   FSMountPermissionFlags wanted))
+{
+    return ksurface_fs_sandbox_copy_sandbox_extensions_for_entitlements(path, wanted, NULL);
+}
+
+LIBKERN_DEFINE_PATCHABLE(CFDataRef, ksurface_fs_sandbox_copy_sandbox_extension_for_arbitary_path, (const char *path,
+                                                                                                   FSMountPermissionFlags wanted))
 {
     if(path == NULL || path[0] != '/')
     {

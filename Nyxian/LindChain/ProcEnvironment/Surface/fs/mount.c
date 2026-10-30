@@ -21,6 +21,8 @@
 */
 
 #include <LindChain/ProcEnvironment/Surface/fs/mount.h>
+#include <LindChain/ProcEnvironment/Surface/trust/entitlement.h>
+#include <LindChain/ProcEnvironment/Surface/libkern/kpanic.h>
 #include <sys/stat.h>
 #include <string.h>
 #include <dirent.h>
@@ -28,8 +30,8 @@
 #include <limits.h>
 #include <os/lock.h>
 
-const char *FS_MOUNT_SANDBOX = "/dev/sandbox";
-const char *FS_MOUNT_NOUNLINK = "/dev/nounlink";
+const char FS_MOUNT_SANDBOX[PATH_MAX] = "/dev/sandbox";
+const char FS_MOUNT_NOUNLINK[PATH_MAX] = "/dev/nounlink";
 
 static os_unfair_lock g_mount_lock = OS_UNFAIR_LOCK_INIT;
 
@@ -126,35 +128,23 @@ kern_return_t ksurface_fs_mount2(FSMountAttr attributes,
     }
     
     /* check for yet unsupported flags */
-    if(attributes & (kFSMountAttrReadPlatform | kFSMountAttrWritePlatform | kFSMountAttrReadEntitlement | kFSMountAttrWriteEntitlement))
+    if((attributes & (kFSMountAttrReadEntitlement | kFSMountAttrWriteEntitlement)) ||
+       ((attributes & kFSMountAttrWrite) && !(attributes & kFSMountAttrRead)) /* we need write only path's some day at some point lol */)
     {
         return KERN_NOT_SUPPORTED;
     }
     
-    /* manage permissions */
+    /* figure out sandboxing permissions */
     FSMountPermissionFlags permissions = kFSMountPermissionNone;
-    if((attributes & kFSMountAttrWrite) && !(attributes & kFSMountAttrRead))
+    if(attributes & (kFSMountAttrWrite | kFSMountAttrRead))
     {
-        return KERN_INVALID_ARGUMENT;
-    }
-    
-    if(attributes & kFSMountAttrWrite)
-    {
-        permissions = kFSMountPermissionReadWrite;
-    }
-    else if(attributes & kFSMountAttrRead)
-    {
-        permissions = kFSMountPermissionRead;
-    }
-    else
-    {
-        permissions = kFSMountPermissionNone;
+        permissions = (attributes & kFSMountAttrWrite) ? kFSMountPermissionReadWrite : kFSMountPermissionRead;
     }
     
     /* if bind_dir is givven it becomes a directory */
     FSNodeType type = kFSNodeTypeSymbolicLink;
-    static const char preserver_device[PATH_MAX] = "/dev/nounlink";
-    if(strncmp(device_dir, preserver_device, sizeof(preserver_device)) == 0)
+    if(device_dir == FS_MOUNT_NOUNLINK ||
+       strncmp(device_dir, FS_MOUNT_NOUNLINK, PATH_MAX) == 0)
     {
         type = kFSNodeTypeDirectory;
     }
@@ -185,7 +175,16 @@ kern_return_t ksurface_fs_mount2(FSMountAttr attributes,
     }
     
     /* adding sandbox filesystem register for mount */
-    kr = ksurface_fs_sandbox_registry_add(permissions, type, mount_dir, (type == kFSNodeTypeDirectory) ? NULL : device_dir);
+    kr = ksurface_fs_sandbox_registry_add(permissions, type, mount_dir, (type == kFSNodeTypeDirectory) ? NULL : device_dir, attributes & kFSMountAttrReadPlatform ? kNXT2EntitlementPlatform : NULL, attributes & kFSMountAttrWritePlatform ? kNXT2EntitlementPlatform : NULL);
+    if(kr != KERN_SUCCESS)
+    {
+        /* need to recert preserver addition */
+        kern_return_t kr_critical = ksurface_fs_preserver_remove_node(node.name);
+        if(kr_critical != KERN_SUCCESS)
+        {
+            kpanic("failed to remove preserver node on failure of adding sandbox registry entry: %s (sbx entry error: %s)", mach_error_string(kr_critical), mach_error_string(kr));
+        }
+    }
     os_unfair_lock_unlock(&g_mount_lock);
     return kr;
 }
