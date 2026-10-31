@@ -222,23 +222,103 @@ void LCUnmapMachO(LCMachO *machO)
     free(machO);
 }
 
+static const char LCLibCppPath[] = "/usr/lib/libc++.1.dylib";
+
+static bool LCValidateLoadCommands(LCMachO *machO)
+{
+    const uint8_t *map = (const uint8_t *)machO->map;
+    const uint8_t *header = (const uint8_t *)machO->header;
+    if(header < map ||
+       (size_t)(header - map) > machO->size ||
+       machO->size - (size_t)(header - map) < sizeof(struct mach_header_64))
+    {
+        return false;
+    }
+    
+    size_t available = machO->size - (size_t)(header - map) - sizeof(struct mach_header_64);
+    uint32_t ncmds = machO->header->ncmds;
+    uint32_t sizeofcmds = machO->header->sizeofcmds;
+    if(machO->header->magic != MH_MAGIC_64 || ncmds == 0 || sizeofcmds > available)
+    {
+        return false;
+    }
+    
+    const uint8_t *cmds = header + sizeof(struct mach_header_64);
+    uint32_t off = 0;
+    for(uint32_t i = 0; i < ncmds; i++)
+    {
+        if(sizeofcmds - off < sizeof(struct load_command))
+        {
+            return false;
+        }
+        
+        const struct load_command *lc = (const struct load_command *)(cmds + off);
+        const uint32_t cmdsize = lc->cmdsize;
+        if(cmdsize < sizeof(struct load_command) || (cmdsize & 7) != 0 || cmdsize > sizeofcmds - off)
+        {
+            return false;
+        }
+        
+        if(lc->cmd == LC_SEGMENT_64)
+        {
+            if(cmdsize < sizeof(struct segment_command_64))
+            {
+                return false;
+            }
+            
+            const struct segment_command_64 *seg = (const struct segment_command_64 *)lc;
+            if(seg->nsects > (cmdsize - sizeof(struct segment_command_64)) / sizeof(struct section_64))
+            {
+                return false;
+            }
+        }
+        else if(lc->cmd == 0x114514)
+        {
+            if(cmdsize < sizeof(struct dylib_command))
+            {
+                return false;
+            }
+            
+            const uint32_t nameOff = ((const struct dylib_command *)lc)->dylib.name.offset;
+            if(nameOff < sizeof(struct dylib_command) ||
+               nameOff >= cmdsize ||
+               cmdsize - nameOff < sizeof(LCLibCppPath))
+            {
+                return false;
+            }
+        }
+        
+        off += cmdsize;
+    }
+    
+    return off == sizeofcmds;
+}
+
 static void LCInsertDylibCommand(LCMachO *machO,
                                  const char *path,
-                                 uint32_t cmd)
+                                 uint32_t cmd,
+                                 long *freeSpace)
 {
-    const char *name = cmd==LC_ID_DYLIB ? basename((char *)path) : path;
+    const char *lastSlash = cmd == LC_ID_DYLIB ? strrchr(path, '/') : NULL;
+    const char *name = lastSlash != NULL ? lastSlash + 1 : path;
     struct dylib_command *dylib;
     size_t cmdsize = sizeof(struct dylib_command) + rnd32((uint32_t)strlen(name) + 1, 8);
+    if(*freeSpace < 0 || (size_t)*freeSpace < cmdsize)
+    {
+        return;
+    }
+    *freeSpace -= (long)cmdsize;
+    
     if(cmd == LC_ID_DYLIB)
     {
         dylib = (struct dylib_command *)(sizeof(struct mach_header_64) + (uintptr_t)machO->header);
         memmove((void *)((uintptr_t)dylib + cmdsize), (void *)dylib, machO->header->sizeofcmds);
-        bzero(dylib, cmdsize);
     }
     else
     {
         dylib = (struct dylib_command *)(sizeof(struct mach_header_64) + (void *)machO->header+machO->header->sizeofcmds);
     }
+    bzero(dylib, cmdsize);
     dylib->cmd = cmd;
     dylib->cmdsize = (uint32_t)cmdsize;
     dylib->dylib.name.offset = sizeof(struct dylib_command);
@@ -252,7 +332,7 @@ static void LCInsertDylibCommand(LCMachO *machO,
 
 bool LCPatchExecSlice(LCMachO *machO)
 {
-    if(machO->ro)
+    if(machO->ro || !LCValidateLoadCommands(machO))
     {
         return false;
     }
@@ -266,20 +346,18 @@ bool LCPatchExecSlice(LCMachO *machO)
         machO->header->flags |= MH_NO_REEXPORTED_DYLIBS;
         machO->header->flags &= ~MH_PIE;
     }
-
+    
     // Patch __PAGEZERO to map just a single zero page, fixing "out of address space"
     struct segment_command_64 *seg = (struct segment_command_64 *)imageHeaderPtr;
-    assert(seg->cmd == LC_SEGMENT_64 || seg->cmd == LC_ID_DYLIB);
-    if(seg->cmd == LC_SEGMENT_64 && strcmp(seg->segname, "__PAGEZERO") == 0)
+    if(seg->cmd == LC_SEGMENT_64 && strncmp(seg->segname, "__PAGEZERO", sizeof(seg->segname)) == 0)
     {
         seg->vmaddr = 0x100000000 - 0x4000;
         seg->vmsize = 0x4000;
     }
-
+    
     BOOL hasDylibCommand = NO;
     struct dylib_command * dylibLoaderCommand = 0;
-    const char *libCppPath = "/usr/lib/libc++.1.dylib";
-    int textSectionOffest = 0;
+    uint32_t textSectionOffest = 0;
     struct load_command *command = (struct load_command *)imageHeaderPtr;
     bool codeSignatureCommandFound = false;
     for(int i = 0; i < machO->header->ncmds; i++)
@@ -295,12 +373,12 @@ bool LCPatchExecSlice(LCMachO *machO)
             case LC_SEGMENT_64:
             {
                 struct segment_command_64* seglc = (struct segment_command_64*)command;
-                if(strcmp("__TEXT", seglc->segname) == 0)
+                if(strncmp("__TEXT", seglc->segname, sizeof(seglc->segname)) == 0)
                 {
                     for(uint32_t j = 0; j < seglc->nsects; j++)
                     {
                         struct section_64* sect = (struct section_64*)(((void*)command + sizeof(struct segment_command_64) + sizeof(struct section_64) * j));
-                        if(0 == strcmp("__text", sect->sectname))
+                        if(0 == strncmp("__text", sect->sectname, sizeof(sect->sectname)))
                         {
                             textSectionOffest = sect->offset;
                         }
@@ -315,7 +393,15 @@ bool LCPatchExecSlice(LCMachO *machO)
         }
         command = (struct load_command *)((void *)command + command->cmdsize);
     }
-    long freeLoadCommandCountLeft = (void*)machO->header + textSectionOffest - (void*)command;
+    
+    /* __text is file controlled, it only counts as free space if it lies behind the commands and inside of the file */
+    uint64_t commandsEnd = sizeof(struct mach_header_64) + (uint64_t)machO->header->sizeofcmds;
+    uint64_t sliceAvailable = machO->size - (size_t)((uint8_t*)machO->header - (uint8_t*)machO->map);
+    long freeLoadCommandCountLeft = 0;
+    if(textSectionOffest > commandsEnd && textSectionOffest <= sliceAvailable)
+    {
+        freeLoadCommandCountLeft = (long)(textSectionOffest - commandsEnd);
+    }
     int tweakLoaderLoadDylibCmdSize = 0x48;
     
     // Insert command priority: LC_CODE_SIGNATURE > LC_ID_DYLIB > LC_LOAD_DYLIB
@@ -323,21 +409,22 @@ bool LCPatchExecSlice(LCMachO *machO)
     {
         freeLoadCommandCountLeft -= 0x10;
     }
-    if(!hasDylibCommand && freeLoadCommandCountLeft >= sizeof(struct dylib_command))
-    {
-        freeLoadCommandCountLeft -= sizeof(struct dylib_command);
-        LCInsertDylibCommand(machO, machO->path, LC_ID_DYLIB);
-    }
-
+    
+    /* has to happen first, inserting LC_ID_DYLIB moves every command and leaves this pointer stale */
     if(dylibLoaderCommand)
     {
         dylibLoaderCommand->cmd = 0x114514;
-        strcpy((void *)dylibLoaderCommand + dylibLoaderCommand->dylib.name.offset, libCppPath);
+        strlcpy((void *)dylibLoaderCommand + dylibLoaderCommand->dylib.name.offset, LCLibCppPath, dylibLoaderCommand->cmdsize - dylibLoaderCommand->dylib.name.offset);
     }
-    else if(freeLoadCommandCountLeft >= tweakLoaderLoadDylibCmdSize)
+    
+    if(!hasDylibCommand)
     {
-        freeLoadCommandCountLeft -= tweakLoaderLoadDylibCmdSize;
-        LCInsertDylibCommand(machO, libCppPath, 0x114514);
+        LCInsertDylibCommand(machO, machO->path, LC_ID_DYLIB, &freeLoadCommandCountLeft);
+    }
+    
+    if(!dylibLoaderCommand && freeLoadCommandCountLeft >= tweakLoaderLoadDylibCmdSize)
+    {
+        LCInsertDylibCommand(machO, LCLibCppPath, 0x114514, &freeLoadCommandCountLeft);
     }
     
     // Ensure No duplicated dylibs, often caused by incorrect tweak injection
@@ -361,7 +448,7 @@ bool LCPatchExecSlice(LCMachO *machO)
         {
             goto fail;
         }
-
+        
         struct load_command *lc = (struct load_command *)(cmds + off);
         const uint32_t cmdsize = lc->cmdsize;
         if(cmdsize < sizeof(struct load_command) || (cmdsize & 7) != 0 || cmdsize > sizeofcmds - off)
@@ -422,7 +509,7 @@ NSString *LCPatchMachOFixupARM64eSlice(const char *path)
     {
         return [NSString stringWithFormat:@"Failed to map %s: %s", path, strerror(errno)];
     }
-
+    
     uint32_t magic = *(uint32_t *)machO->map;
     if(magic == FAT_CIGAM)
     {
