@@ -1,23 +1,24 @@
 /*
- SPDX-License-Identifier: AGPL-3.0-or-later
+ SPDX-License-Identifier: LicenseRef-EPSL-1.1
 
  Copyright (C) 2025 - 2026 emexlab
  Copyright (C) 2026 semvis123
 
  This file is part of Nyxian.
 
- Nyxian is free software: you can redistribute it and/or modify
- it under the terms of the GNU Affero General Public License as published by
- the Free Software Foundation, either version 3 of the License, or
- (at your option) any later version.
+ Licensed under the emexLabs Public Source License, version 1.1
+ (EPSL 1.1).
 
- Nyxian is distributed in the hope that it will be useful,
- but WITHOUT ANY WARRANTY; without even the implied warranty of
- MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- GNU Affero General Public License for more details.
+ Private use and modification are permitted under the license.
+ Redistribution of source or binaries, modified or unmodified,
+ requires prior written permission from emexLabs.
 
- You should have received a copy of the GNU Affero General Public License
- along with Nyxian. If not, see <https://www.gnu.org/licenses/>.
+ External deployment is subject to the source-availability
+ requirements and other conditions of the license.
+
+ Provided "AS IS", without warranty, to the extent permitted by law.
+
+ See LICENSE for the full license terms.
 */
 
 /* ----------------------------------------------------------------------
@@ -303,7 +304,8 @@ static void trust_identity_append_file_permissions(NSMutableArray<NSData*> *file
                                                    NSString *rawPath,
                                                    NSDictionary *pathVariables,
                                                    FSMountPermissionFlags permission,
-                                                   BOOL over_sbfs_layer)
+                                                   BOOL over_sbfs_layer,
+                                                   CFDictionaryRef entitlements)
 {
     NSArray<NSString*> *paths = PEResolveEntitlementPaths(rawPath, pathVariables);
     for(NSString *path in paths)
@@ -313,7 +315,7 @@ static void trust_identity_append_file_permissions(NSMutableArray<NSData*> *file
         {
             if(over_sbfs_layer)
             {
-                NSArray<NSData*> *extensions = (__bridge_transfer NSArray<NSData*>*)ksurface_fs_sandbox_copy_sandbox_extensions(actualPath.UTF8String, permission);
+                NSArray<NSData*> *extensions = (__bridge_transfer NSArray<NSData*>*)ksurface_fs_sandbox_copy_sandbox_extensions_for_entitlements(actualPath.UTF8String, permission, entitlements);
                 if(extensions != nil)
                 {
                     [filePermissions addObjectsFromArray:extensions];
@@ -336,11 +338,12 @@ static void trust_identity_append_file_permissions_for_paths(NSMutableArray<NSDa
                                                              NSArray<NSString*> *rawPaths,
                                                              NSDictionary *pathVariables,
                                                              FSMountPermissionFlags permission,
-                                                             BOOL over_sbfs_layer)
+                                                             BOOL over_sbfs_layer,
+                                                             CFDictionaryRef entitlements)
 {
     for(NSString *rawPath in rawPaths)
     {
-        trust_identity_append_file_permissions(filePermissions, rawPath, pathVariables, permission, over_sbfs_layer);
+        trust_identity_append_file_permissions(filePermissions, rawPath, pathVariables, permission, over_sbfs_layer, entitlements);
     }
 }
 
@@ -362,7 +365,7 @@ LIBKERN_DEFINE_PATCHABLE(CFArrayRef, trust_identity_give_file_permissions, (CFSt
         {
             trust_identity_append_file_permissions_for_paths(filePermissions, @[
                 @"$(NXROOT)",
-            ], vars, kFSMountPermissionReadWrite, true);
+            ], vars, kFSMountPermissionReadWrite, true, entitlements);
             return (__bridge_retained CFArrayRef)filePermissions;
         }
         
@@ -378,24 +381,24 @@ LIBKERN_DEFINE_PATCHABLE(CFArrayRef, trust_identity_give_file_permissions, (CFSt
         NSDictionary *nsEntitlements = (__bridge NSDictionary*)entitlements;
         
         /* append file permissions from entitlements */
-        trust_identity_append_file_permissions_for_paths(filePermissions, nsEntitlements[(__bridge NSString*)kNXT2EntitlementSandboxFileRead], vars, kFSMountPermissionRead, true);
-        trust_identity_append_file_permissions_for_paths(filePermissions, nsEntitlements[(__bridge NSString*)kNXT2EntitlementSandboxFileReadWrite], vars, kFSMountPermissionReadWrite, true);
+        trust_identity_append_file_permissions_for_paths(filePermissions, nsEntitlements[(__bridge NSString*)kNXT2EntitlementSandboxFileRead], vars, kFSMountPermissionRead, true, entitlements);
+        trust_identity_append_file_permissions_for_paths(filePermissions, nsEntitlements[(__bridge NSString*)kNXT2EntitlementSandboxFileReadWrite], vars, kFSMountPermissionReadWrite, true, entitlements);
         
         /* append extra file permissions that are on by default */
         trust_identity_append_file_permissions_for_paths(filePermissions, @[
             @"$(NXROOT)/boot/rtpatch",
             @"$(NXROOT)/boot/patchfinder.bin"
-        ], vars, kFSMountPermissionRead, true);
+        ], vars, kFSMountPermissionRead, true, entitlements);
         
         /* handling the most powerful entitlement known to ksurface */
         if(CFDictionaryGetValue(entitlements, kNXT2EntitlementSandboxHost) == kCFBooleanTrue)
         {
-            trust_identity_append_file_permissions(filePermissions, @"$(NXROOT)/../../*", vars, kFSMountPermissionRead, false); /* making host data container sub paths readable */
+            trust_identity_append_file_permissions(filePermissions, @"$(NXROOT)/../../*", vars, kFSMountPermissionRead, false, NULL);   /* making host data container sub paths readable */
             trust_identity_append_file_permissions_for_paths(filePermissions, @[
                 @"$(NXROOT)/../*",          /* full documents path rw in container of host */
                 @"$(NXROOT)/../Library/*",  /* full library path rw in container of host */
                 @"$(NXROOT)/../tmp",        /* full tmp RW */
-            ], vars, kFSMountPermissionReadWrite, false);
+            ], vars, kFSMountPermissionReadWrite, false, NULL);
         }
         return (__bridge_retained CFArrayRef)filePermissions;
     }
@@ -474,13 +477,13 @@ static bool trust_resign_with_fd(int *fd,
         return false;
     }
     
-    static os_unfair_lock resign_lock = OS_UNFAIR_LOCK_INIT;
-    
     if(result_nxt2->isValid &&
        result_nxt2->isCdHashValid &&
        result_nxt2->needsResign)
     {
+        static os_unfair_lock resign_lock = OS_UNFAIR_LOCK_INIT;
         os_unfair_lock_lock(&resign_lock);
+        
         if(![LCUtils signMachOAtURL:[NSURL fileURLWithPath:[NSString stringWithCString:path encoding:NSUTF8StringEncoding]]])
         {
             os_unfair_lock_unlock(&resign_lock);
@@ -514,9 +517,10 @@ static bool trust_resign_with_fd(int *fd,
         
         CFRelease(result_nxt2->entitlements);
         memcpy(result_nxt2, &new_result_nxt2, sizeof(*result_nxt2));
+        
+        os_unfair_lock_unlock(&resign_lock);
     }
     
-    os_unfair_lock_unlock(&resign_lock);
     return true;
 }
 
