@@ -182,19 +182,33 @@ out_dealloc:
     }
     
     /* task port validation */
-    ipc_info_object_type_t type;
+    ipc_info_object_type_t task_type;
     mach_vm_address_t address;
-    kr = mach_port_kobject(mach_task_self(), request.v.task.name, &type, &address);
+    kr = mach_port_kobject(mach_task_self(), request.v.task.name, &task_type, &address);
     if(kr != KERN_SUCCESS)
     {
-        klog_log("task_handoff", "failed getting the kobject type: %s", mach_error_string(kr));
+        klog_log("task_handoff", "failed getting the task kobject type: %s", mach_error_string(kr));
+        goto out_failure;
+    }
+    
+    ipc_info_object_type_t thread_type;
+    kr = mach_port_kobject(mach_task_self(), request.v.thread.name, &thread_type, &address);
+    if(kr != KERN_SUCCESS)
+    {
+        klog_log("task_handoff", "failed getting the thread kobject type: %s", mach_error_string(kr));
         goto out_failure;
     }
     
     /* checking for ipc object type */
-    if(type != IPC_OTYPE_TASK_CONTROL)  /* also known as IKOT_TASK.. aka kernel task port */
+    if(task_type != IPC_OTYPE_TASK_CONTROL)  /* also known as IKOT_TASK.. aka kernel task port */
     {
-        klog_log("task_handoff", "port %d backed by ipc object with type %d is not a IKOT_TASK ipc object", request.v.task.name, type);
+        klog_log("task_handoff", "port %d backed by ipc object with type %d is not a IKOT_TASK ipc object", request.v.task.name, task_type);
+        goto out_failure;
+    }
+    
+    if(thread_type != IPC_OTYPE_THREAD_CONTROL)
+    {
+        klog_log("task_handoff", "port %d backed by ipc object with type %d is not a thread ipc object", request.v.thread.name, thread_type);
         goto out_failure;
     }
     
