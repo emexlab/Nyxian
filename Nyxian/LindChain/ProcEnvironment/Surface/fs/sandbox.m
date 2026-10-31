@@ -377,6 +377,33 @@ static FSMountPermissionFlags fs_backing_permission(const char *phys)
     return best;
 }
 
+static FSMountPermissionFlags fs_entitlement_cap(const char *phys,
+                                                 FSMountPermissionFlags perm,
+                                                 CFDictionaryRef entitlements)
+{
+    for(size_t i = 0; i < g_record_count; i++)
+    {
+        const FSMountRecord *r = &g_records[i];
+        if(!fs_contains(r->phys, phys))
+        {
+            continue;
+        }
+        
+        if(r->entitlementNeededRead != NULL &&
+           (entitlements == NULL || CFDictionaryGetValue(entitlements, r->entitlementNeededRead) != kCFBooleanTrue))
+        {
+            return kFSMountPermissionNone;
+        }
+        
+        if(r->entitlementNeededWrite != NULL &&
+           (entitlements == NULL || CFDictionaryGetValue(entitlements, r->entitlementNeededWrite) != kCFBooleanTrue))
+        {
+            perm = FS_PERM_MIN(perm, kFSMountPermissionRead);
+        }
+    }
+    return perm;
+}
+
 LIBKERN_DEFINE_PATCHABLE(CFArrayRef, ksurface_fs_sandbox_copy_sandbox_extensions_for_entitlements, (const char *path,
                                                                                                     FSMountPermissionFlags wanted,
                                                                                                     CFDictionaryRef entitlements))
@@ -416,6 +443,7 @@ LIBKERN_DEFINE_PATCHABLE(CFArrayRef, ksurface_fs_sandbox_copy_sandbox_extensions
         
         FSMountPermissionFlags perm = FS_PERM_MIN(wanted, link_cap);
         perm = FS_PERM_MIN(perm, fs_backing_permission(phys));
+        perm = fs_entitlement_cap(phys, perm, entitlements);
         if(perm == kFSMountPermissionNone)
         {
             klog_log("ksurface:fs:sandbox", "no mount grants access at %s", path);
@@ -448,20 +476,6 @@ LIBKERN_DEFINE_PATCHABLE(CFArrayRef, ksurface_fs_sandbox_copy_sandbox_extensions
             }
             
             FSMountPermissionFlags perm = FS_PERM_MIN(wanted, r->permission);
-            
-            if(entitlements != NULL)
-            {
-                if(r->entitlementNeededRead != NULL && CFDictionaryGetValue(entitlements, r->entitlementNeededRead) != kCFBooleanTrue)
-                {
-                    continue;
-                }
-                
-                /* write only doesnt work yet lol*/
-                if(r->entitlementNeededWrite != NULL && CFDictionaryGetValue(entitlements, r->entitlementNeededWrite) != kCFBooleanTrue)
-                {
-                    perm = FS_PERM_MIN(perm, kFSMountPermissionRead);
-                }
-            }
             
             if(perm == kFSMountPermissionNone)
             {
