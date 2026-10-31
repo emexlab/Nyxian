@@ -82,6 +82,7 @@ DEFINE_SYSCALL_HANDLER(proc_info_pidinfo)
             
             kvo_rdlock(target);
             struct proc_bsdinfo bsd_pcb;    /* BSD process control block likely idk */
+            bzero(&bsd_pcb, sizeof(struct proc_bsdinfo));
             bsd_pcb.pbi_flags = target->bsd.kp_proc.p_flag;     /* idk */
             bsd_pcb.pbi_status = target->bsd.kp_proc.p_stat;    /* idk */
             bsd_pcb.pbi_xstatus = target->bsd.kp_proc.p_stat;   /* idk */
