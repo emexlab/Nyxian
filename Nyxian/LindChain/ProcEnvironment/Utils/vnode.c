@@ -116,7 +116,6 @@ int vnode_inaccessible_open(const char *path,
     int fd = open(copyPath, O_RDONLY);
     if(fd < 0)
     {
-        close(fd);
         free(copyPath);
         os_unfair_lock_unlock(&g_vnode_inaccessible_inode_lock);
         return -1;
