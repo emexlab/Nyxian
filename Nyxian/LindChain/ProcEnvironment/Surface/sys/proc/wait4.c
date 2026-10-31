@@ -143,6 +143,43 @@ out_trigger_unregister:
     return true;
 }
 
+static void wait4_replay_children(ksurface_proc_t *parent,
+                                  pid_t selector,
+                                  pid_t caller_pgid)
+{
+    ksurface_proc_t *children[CHILD_PROC_MAX];
+    uint64_t count = 0;
+    
+    pthread_mutex_lock(&(parent->children.mutex));
+    for(uint64_t i = 0; i < parent->children.children_cnt && count < CHILD_PROC_MAX; i++)
+    {
+        ksurface_proc_t *child = parent->children.children[i];
+        if(!kvo_retain(child))
+        {
+            continue;
+        }
+        
+        kvo_rdlock(child);
+        bool matches = wait4_matches_selector(selector, caller_pgid, child);
+        kvo_unlock(child);
+        
+        if(!matches)
+        {
+            kvo_release(child);
+            continue;
+        }
+        
+        children[count++] = child;
+    }
+    pthread_mutex_unlock(&(parent->children.mutex));
+    
+    for(uint64_t i = 0; i < count; i++)
+    {
+        kvo_event_trigger(parent, kProcEventTypeWait4, (uintptr_t)children[i]);
+        kvo_release(children[i]);
+    }
+}
+
 DEFINE_SYSCALL_HANDLER(wait4)
 {
     pid_t u_pid = (pid_t)args[0];
@@ -198,29 +235,29 @@ DEFINE_SYSCALL_HANDLER(wait4)
         kvo_release(proc);
     }
     
+    pthread_mutex_unlock(&(sys_proc_->children.mutex));
+    
     if(!matched_child)
     {
-        pthread_mutex_unlock(&(sys_proc_->children.mutex));
         sys_return_failure_with_errno(ECHILD);
     }
     
     if((u_options & WNOHANG) == WNOHANG)
     {
-        pthread_mutex_unlock(&(sys_proc_->children.mutex));
         sys_return;
     }
     
     wait4_payload_t *payload = malloc(sizeof(wait4_payload_t));
     if(payload == NULL)
     {
-        pthread_mutex_unlock(&(sys_proc_->children.mutex));
         sys_return_failure_with_errno(ENOMEM);
     }
     
     kern_return_t kr = mach_port_mod_refs(mach_task_self(), sys_task_, MACH_PORT_RIGHT_SEND, 1);
     if(kr != KERN_SUCCESS)
     {
-        goto out_again;
+        free(payload);
+        sys_return_failure_with_errno(EAGAIN);
     }
     
     payload->task = sys_task_;
@@ -235,15 +272,12 @@ DEFINE_SYSCALL_HANDLER(wait4)
     if(kr != KERN_SUCCESS)
     {
         mach_port_deallocate(mach_task_self(), sys_task_);
-        
-    out_again:
-        pthread_mutex_unlock(&(sys_proc_->children.mutex));
         free(payload);
         sys_return_failure_with_errno(EAGAIN);
     }
     
-    pthread_mutex_unlock(&(sys_proc_->children.mutex));
-    
     *recv_buffer = NULL;
+    
+    wait4_replay_children(sys_proc_, u_pid, caller_pgid);
     sys_return;
 }
