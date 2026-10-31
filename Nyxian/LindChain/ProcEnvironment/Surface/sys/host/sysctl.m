@@ -302,7 +302,7 @@ int sysctl_kernhostname(sysctl_req_t *req)
         }
         
         /* copy buffer in */
-        char *newname = syscall_alloc_in(req->task, req->newlen, req->newp);
+        char *newname = syscall_copy_str_in(req->task, req->newp, req->newlen);
         if(!newname)
         {
             req->err = EFAULT;
