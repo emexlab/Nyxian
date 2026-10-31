@@ -41,7 +41,7 @@ kern_return_t tty_for_port(fileport_t port,
     struct socket_fdinfo si;
     int ret = proc_pidfdinfo(getpid(), fd, PROC_PIDFDSOCKETINFO, &si, sizeof(si));
     close(fd);
-    if(ret <= 0)
+    if(ret < (int)sizeof(si) || si.psi.soi_kind != SOCKINFO_UN)
     {
         return KERN_FAILURE;
     }
