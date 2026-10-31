@@ -88,7 +88,7 @@ kern_return_t ksurface_fs_init(void)
     ksurface_fs_init_mount3(kFSMountAttrRead | kFSMountAttrClear, FS_MOUNT_NOUNLINK, "$mnt/devfs");
     ksurface_fs_init_mount3(kFSMountAttrRead | kFSMountAttrClear, FS_MOUNT_NOUNLINK, "$mnt/bootfs");
     ksurface_fs_init_mount3(kFSMountAttrRead, FS_MOUNT_NOUNLINK, "$mnt/kextfs");
-    ksurface_fs_init_mount3(kFSMountAttrRead | kFSMountAttrWrite, FS_MOUNT_NOUNLINK, "$mnt/lsfs");
+    ksurface_fs_init_mount3(kFSMountAttrRead | kFSMountAttrWrite | kFSMountAttrWritePlatform, FS_MOUNT_NOUNLINK, "$mnt/lsfs");
     ksurface_fs_init_mount3(kFSMountAttrRead | kFSMountAttrWrite, FS_MOUNT_NOUNLINK, "$mnt/etcfs");
     
     /* bootfs */
@@ -107,7 +107,7 @@ kern_return_t ksurface_fs_init(void)
     /* lsfs */
     ksurface_fs_init_mount3(kFSMountAttrRead, "$bootloader/Shared/LaunchServices/org.emexlabs.bootstrapd.plist", "$mnt/lsfs/org.emexlabs.bootstrapd.plist");
     ksurface_fs_init_mount3(kFSMountAttrRead, "$bootloader/Shared/LaunchServices/org.emexlabs.compilerd.plist", "$mnt/lsfs/org.emexlabs.compilerd.plist");
-    ksurface_fs_init_mount3(kFSMountAttrRead | kFSMountAttrWrite, "$mnt/lsfs", "$vroot/System/Library/LaunchDaemons");
+    ksurface_fs_init_mount3(kFSMountAttrRead | kFSMountAttrWrite | kFSMountAttrWritePlatform, "$mnt/lsfs", "$vroot/System/Library/LaunchDaemons");
     
     /* etcfs */
     ksurface_fs_init_mount3(kFSMountAttrRead | kFSMountAttrWrite, "$mnt/etcfs", "$vroot/etc");
