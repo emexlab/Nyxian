@@ -204,16 +204,13 @@ LIBKERN_DEFINE_PATCHABLE(kern_return_t, proc_kill, (ksurface_proc_t *child,
     return KERN_SUCCESS;
 }
 
-kern_return_t proc_reap(ksurface_proc_t *proc)
+static inline kern_return_t proc_reap_nolock(ksurface_proc_t *proc)
 {
     assert(proc != NULL && proc != kernel_proc_);
-    
-    proc_table_wrlock();
     
     /* retain process that wants to exit */
     if(!kvo_retain(proc))
     {
-        proc_table_unlock();
         return KERN_FAILURE;
     }
     
@@ -238,7 +235,7 @@ kern_return_t proc_reap(ksurface_proc_t *proc)
         pthread_mutex_unlock(&(proc->children.mutex));
         
         /* calling exit on the child */
-        proc_reap(child);
+        proc_reap_nolock(child);
         
         /* releasing reference previously retained */
         kvo_release(child);
@@ -259,7 +256,6 @@ kern_return_t proc_reap(ksurface_proc_t *proc)
         {
             /* releasing child */
             kvo_release(proc);
-            proc_table_unlock();
             return KERN_FAILURE;
         }
         
@@ -315,8 +311,16 @@ kern_return_t proc_reap(ksurface_proc_t *proc)
         [process forceTerminate];
     }
     
-    proc_table_unlock();
     return KERN_SUCCESS;
+}
+
+kern_return_t proc_reap(ksurface_proc_t *proc)
+{
+    assert(proc != NULL && proc != kernel_proc_);
+    proc_table_wrlock();
+    kern_return_t kr = proc_reap_nolock(proc);
+    proc_table_unlock();
+    return kr;
 }
 
 kern_return_t proc_zombify(ksurface_proc_t *proc)
