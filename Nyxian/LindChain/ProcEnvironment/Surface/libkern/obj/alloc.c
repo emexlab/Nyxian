@@ -203,7 +203,7 @@ bool kvobject_snapshot_into_mem(void *mem,
     bool did_succeed = false;
     if(!kvo_retain(kvo))
     {
-        goto out_unlock;
+        goto out_release;
     }
     
     kvo_rdlock(kvo);
@@ -231,7 +231,7 @@ bool kvobject_snapshot_into_mem(void *mem,
     
 out_unlock:
     kvo_unlock(kvo);
-    
+out_release:
     /* release object if applicable */
     if(option == kvObjSnapStatic ||
        option == kvObjSnapConsumeReference)
