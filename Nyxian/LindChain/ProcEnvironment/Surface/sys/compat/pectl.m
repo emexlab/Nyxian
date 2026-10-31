@@ -296,38 +296,8 @@ DEFINE_SYSCALL_HANDLER(pectl_codesigning)
             sys_return;
         }
         case kPECTLCodeSigningLoadKernelExtension:
-        {
-            if(!entitlement_got_entitlement(proc_getentitlements(sys_proc_snapshot_), kPEEntitlementFlagLoadKEXT))
-            {
-                sys_return_failure_with_errno(EPERM);
-            }
-            
-            userspace_pointer_t userspace_str = (userspace_pointer_t)args[2];
-            char *extensionPath = syscall_copy_str_in(sys_task_, userspace_str, MAXHOSTNAMELEN);
-            if(extensionPath == NULL)
-            {
-                sys_return_failure_with_errno(ENOMEM);
-            }
-            
-            /* spinning the extension up~ */
-            kxld_image_info_t *image_info = NULL;
-            if(kxopen(extensionPath, KXLD_DEFAULT, &image_info) != KERN_SUCCESS)
-            {
-                sys_return_failure_with_errno(errno);
-            }
-            return (int64_t)image_info;
-        }
         case kPECTLCodeSigningUnloadKernelExtension:
-        {
-            if(!entitlement_got_entitlement(proc_getentitlements(sys_proc_snapshot_), kPEEntitlementFlagLoadKEXT))
-            {
-                sys_return_failure_with_errno(EPERM);
-            }
-            
-            void *image = (void*)args[2];
-            kxclose(image);
-            sys_return;
-        }
+            sys_return_failure_with_errno(ENOTSUP);
         default:
             sys_return_failure_with_errno(ENOSYS);
     }
