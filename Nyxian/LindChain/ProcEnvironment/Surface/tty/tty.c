@@ -23,6 +23,7 @@
 #include <sys/socket.h>
 #include <sys/poll.h>
 #include <stdio.h>
+#include <dispatch/dispatch.h>
 #include <LindChain/ProcEnvironment/Surface/libkern/patch.h>
 #include <LindChain/ProcEnvironment/Surface/libkern/klog.h>
 #include <LindChain/ProcEnvironment/Surface/libkern/kpanic.h>
@@ -32,28 +33,41 @@
 #include <LindChain/ProcEnvironment/Surface/proc/spawn.h>
 #include <LindChain/ProcEnvironment/Surface/surface.h>
 
+static dispatch_queue_t tty_signal_queue(void)
+{
+    static dispatch_queue_t queue;
+    static dispatch_once_t once;
+    dispatch_once(&once, ^{
+        queue = dispatch_queue_create("org.emexlabs.nyxian.tty.signal", DISPATCH_QUEUE_SERIAL);
+    });
+    return queue;
+}
+
 void tty_kill(ksurface_tty_t *tty,
               int sig)
 {
-    kinfo_proc_t *kp  = NULL;
-    size_t len = 0;
-    
-    kern_return_t kr = proc_list(kernel_proc_, &kp, &len, PROC_FLV_PGID, tty->pgrp);
-    if(kr == KERN_SUCCESS)
-    {
-        size_t count = len / sizeof(kinfo_proc_t);
-        for(size_t i = 0; i < count; i++)
+    pid_t pgrp = tty->pgrp;
+    dispatch_async(tty_signal_queue(), ^{
+        kinfo_proc_t *kp  = NULL;
+        size_t len = 0;
+        
+        kern_return_t kr = proc_list(kernel_proc_, &kp, &len, PROC_FLV_PGID, pgrp);
+        if(kr == KERN_SUCCESS)
         {
-            ksurface_proc_t *session_proc = NULL;
-            kr = proc_for_pid(kp[i].kp_proc.p_pid, &session_proc);
-            if(kr == KERN_SUCCESS)
+            size_t count = len / sizeof(kinfo_proc_t);
+            for(size_t i = 0; i < count; i++)
             {
-                proc_kill(session_proc, sig);
-                kvo_release(session_proc);
+                ksurface_proc_t *session_proc = NULL;
+                kr = proc_for_pid(kp[i].kp_proc.p_pid, &session_proc);
+                if(kr == KERN_SUCCESS)
+                {
+                    proc_kill(session_proc, sig);
+                    kvo_release(session_proc);
+                }
             }
+            free(kp);
         }
-        free(kp);
-    }
+    });
 }
 
 LIBKERN_DEFINE_PATCHABLE(int, tty_input, (ksurface_tty_t *tty))
@@ -312,15 +326,16 @@ DEFINE_KVOBJECT_MAIN_EVENT_HANDLER(tty)
                 tty_table_unlock();
                 goto out_fail;
             }
+            
             tty_table_unlock();
             
-            /* lets start da factory */
+            /* lets start da factory, alive first so the thread cannot see 0 and exit */
+            tty->alive = 1;
             if(pthread_create(&tty->pump_thread, NULL, tty_pump_thread, tty) != 0)
             {
+                tty->alive = 0;
                 goto out_fail_radix;
             }
-            
-            tty->alive = 1;
             
             return 0;
         
@@ -340,6 +355,12 @@ DEFINE_KVOBJECT_MAIN_EVENT_HANDLER(tty)
         }
         case kvObjEventDeinit:
             klog_log("tty:deinit", "deinitializing tty @ %p", tty);
+            
+            /* the thread would go on using this tty after it is freed, see tty_signal_queue */
+            if(pthread_equal(pthread_self(), tty->pump_thread))
+            {
+                kpanic("tty deinitialized on its own pump thread");
+            }
             
             /* removing own tty object */
             tty_table_wrlock();
