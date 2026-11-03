@@ -236,6 +236,17 @@ LIBKERN_DEFINE_INTERPOSE_PATCHABLE(tcgetpgrp);
 
 /* libproc API */
 LIBKERN_DEFINE_INTERPOSE_PATCHABLE(__proc_info);
+LIBKERN_DEFINE_INTERPOSE_PATCHABLE(proc_listcoalitions);
+
+/* coalition API, libsystem_kernel calls the syscalls internally so the wrappers are patched too */
+LIBKERN_DEFINE_INTERPOSE_PATCHABLE(__coalition);
+LIBKERN_DEFINE_INTERPOSE_PATCHABLE(__coalition_info);
+LIBKERN_DEFINE_INTERPOSE_PATCHABLE(coalition_create);
+LIBKERN_DEFINE_INTERPOSE_PATCHABLE(coalition_terminate);
+LIBKERN_DEFINE_INTERPOSE_PATCHABLE(coalition_reap);
+LIBKERN_DEFINE_INTERPOSE_PATCHABLE(coalition_info_resource_usage);
+LIBKERN_DEFINE_INTERPOSE_PATCHABLE(coalition_info_set_name);
+LIBKERN_DEFINE_INTERPOSE_PATCHABLE(coalition_info_set_efficiency);
 LIBKERN_DEFINE_INTERPOSE_PATCHABLE(proc_pidinfo);
 LIBKERN_DEFINE_INTERPOSE_PATCHABLE(proc_name);
 LIBKERN_DEFINE_INTERPOSE_PATCHABLE(proc_pidpath);
