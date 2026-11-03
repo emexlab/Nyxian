@@ -29,7 +29,7 @@
 #include <mach-o/dyld.h>
 #include <mach-o/dyld_images.h>
 #include <objc/runtime.h>
-#import <LiveShim/dyld.h>
+#import <LiveProcessLegacy/LPLLSDyld.h>
 
 #include <dlfcn.h>
 #include <execinfo.h>
@@ -39,16 +39,18 @@
 #import <LindChain/ProcEnvironment/litehook/litehook.h>
 #import <LindChain/ProcEnvironment/LiveContainer/Tweaks/Tweaks.h>
 #include <mach-o/ldsyms.h>
-#import <LindChain/Services/bootstrapd/LDEApplicationObject.h>
+#import <Frameworks/LiveProcessLegacy/LindChain/Services/bootstrapd/LDEApplicationObject.h>
 #import <LindChain/ProcEnvironment/Surface/surface.h>
 #import <LindChain/ProcEnvironment/LiveContainer/LCBootstrap.h>
 #import <malloc/malloc.h>
 #import <LindChain/Utils/CFTools.h>
-#import <LiveShim/LiveShimSyscall.h>
+#import <LiveProcessLegacy/LPLSyscall.h>
 #include <ksurface_config.h>
 #include <ksurface_abi.h>
 
 #import <LindChain/ProcEnvironment/Utils/PEMachOUtils.h>
+
+#include <Frameworks/libpatchfind/libpatchfind.h>
 
 typedef struct {
     void *gap_0x0[2];                  // 0x00, 0x08

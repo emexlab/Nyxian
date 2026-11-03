@@ -111,30 +111,13 @@ App is now in extension-less mode, meaning apps cannot run within Nyxian until t
                     }
                 }(), preferredStyle: .alert)
             
-            alert.addAction(UIAlertAction(title: "Not Now", style: .cancel))
-            alert.addAction(UIAlertAction(title: "Set Up Signing", style: .default) { _ in
-                let importPopup: CertificateImporter = CertificateImporter(style: .insetGrouped)
-                let importSettings: UINavigationController = UINavigationController(rootViewController: importPopup)
-                importSettings.modalPresentationStyle = .formSheet
-                
-                // dynamic size
-                if UIDevice.current.userInterfaceIdiom == .phone {
-                    if let sheet = importSettings.sheetPresentationController {
-                        sheet.animateChanges {
-                            sheet.detents = [
-                                .custom { _ in
-                                    return 200
-                                }
-                            ]
-                        }
-                        
-                        sheet.prefersGrabberVisible = true
-                    }
-                }
-                
-                getTopViewController()?.present(importSettings, animated: true)
+            alert.message = "Restart Nyxian to import a valid certificate matching its provisioning profile in the bootloader."
+            alert.addAction(UIAlertAction(title: "Close", style: .cancel))
+            alert.addAction(UIAlertAction(title: "Restart Nyxian", style: .default) { _ in
+                if let symbol = dlsym(UnsafeMutableRawPointer(bitPattern: -2), "PERestartSelf") {
+                    unsafeBitCast(symbol, to: (@convention(c) () -> Void).self)()
+                } else { exit(0) }
             })
-            
             getTopViewController()?.present(alert, animated: true)
         }
     }

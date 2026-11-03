@@ -26,7 +26,7 @@
 
 #include <stdint.h>
 #include <uuid/uuid.h>
-#include <LindChain/ProcEnvironment/litehook/fixup-chains.h>
+#include "fixup-chains.h"
 
 struct dyld_cache_header
 {

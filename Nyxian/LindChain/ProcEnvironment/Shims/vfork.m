@@ -21,10 +21,10 @@
 */
 
 #import <Foundation/Foundation.h>
-#import <LindChain/IDEConsole/Utils.h>
+#import <LiveProcessLegacy/LPLUtils.h>
 #include <LindChain/ProcEnvironment/Shims/vfork.h>
 #include <LindChain/ProcEnvironment/Shims/posix_spawn.h>
-#include <LiveShim/LiveShimSyscall.h>
+#include <LiveProcessLegacy/LPLSyscall.h>
 #include <LindChain/ProcEnvironment/litehook/litehook.h>
 #include <LindChain/ProcEnvironment/LiveContainer/LCBootstrap.h>
 #include <LindChain/Private/mach/mach_vm.h>

@@ -64,6 +64,17 @@
 #define MASTERFD 0
 #define SLAVEFD  1
 
+/* debug: log every termios get/set, see rks_tty_ioctl */
+#define RKS_TTY_TRACE 0
+
+#if RKS_TTY_TRACE
+static const char *rks_tty_mode(const struct termios *t)
+{
+    return (t->c_lflag & ICANON) ? ((t->c_lflag & ECHO) ? "cooked" : "cooked-noecho")
+                                 : ((t->c_lflag & ECHO) ? "raw-echo" : "raw");
+}
+#endif
+
 struct rks_tty {
     int refs;
     pthread_mutex_t lock;           /* termios, winsize, sid/pgrp */
@@ -747,7 +758,12 @@ int64_t rks_tty_ioctl(rks_call_t *call, rks_tty_t *tty, unsigned long request, u
             pthread_mutex_lock(&tty->lock);
             struct termios t = tty->t;
             pthread_mutex_unlock(&tty->lock);
-            if(!rks_copy_out(call->task, arg, &t, sizeof(t))) RKS_FAIL(call, EFAULT);
+            bool ok = rks_copy_out(call->task, arg, &t, sizeof(t));
+#if RKS_TTY_TRACE
+            rks_logf("tty%d: pid %d GETA -> %s lflag=0x%lx%s", tty->index, pid, rks_tty_mode(&t),
+                     (unsigned long)t.c_lflag, ok ? "" : " EFAULT");
+#endif
+            if(!ok) RKS_FAIL(call, EFAULT);
             return 0;
         }
         case TIOCSETA:
@@ -755,8 +771,20 @@ int64_t rks_tty_ioctl(rks_call_t *call, rks_tty_t *tty, unsigned long request, u
         case TIOCSETAF:
         {
             struct termios t;
-            if(!rks_copy_in(call->task, &t, arg, sizeof(t))) RKS_FAIL(call, EFAULT);
+            if(!rks_copy_in(call->task, &t, arg, sizeof(t)))
+            {
+#if RKS_TTY_TRACE
+                rks_logf("tty%d: pid %d SETA%s EFAULT (task 0x%x)", tty->index, pid,
+                         request == TIOCSETAW ? "W" : request == TIOCSETAF ? "F" : "", call->task);
+#endif
+                RKS_FAIL(call, EFAULT);
+            }
             pthread_mutex_lock(&tty->lock);
+#if RKS_TTY_TRACE
+            rks_logf("tty%d: pid %d SETA%s %s -> %s lflag=0x%lx", tty->index, pid,
+                     request == TIOCSETAW ? "W" : request == TIOCSETAF ? "F" : "",
+                     rks_tty_mode(&tty->t), rks_tty_mode(&t), (unsigned long)t.c_lflag);
+#endif
             tty->t = t;
             tty->termios_configured = true;
             pthread_mutex_unlock(&tty->lock);
@@ -861,6 +889,12 @@ int64_t rks_sys_ioctl(rks_call_t *call)
     rks_tty_t *tty = rks_tty_for_port(call->in_ports[0]);
     if(tty == NULL)
     {
+#if RKS_TTY_TRACE
+        if(request == TIOCSETA || request == TIOCSETAW || request == TIOCSETAF || request == TIOCGETA)
+        {
+            rks_logf("tty: pid %d termios ioctl 0x%lx on a non-tty port -> ENOTTY", call->proc->pid, request);
+        }
+#endif
         RKS_FAIL(call, ENOTTY);
     }
     int64_t result = rks_tty_ioctl(call, tty, request, arg);

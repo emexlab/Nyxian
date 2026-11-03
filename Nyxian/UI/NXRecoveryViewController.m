@@ -20,22 +20,15 @@
  See LICENSE for the full license terms.
 */
 
-#import <UI/NXRecoveryViewController.h>
-#import <UI/NXVolumeButtonMonitor.h>
+#import "NXRecoveryViewController.h"
+#import "NXRecoverySurface.h"
+#import "NXVolumeButtonMonitor.h"
+#import "NXRecoveryTerminal.h"
+#include <sys/stat.h>
+#import "TWRP/NXTWRPThemeStore.h"
+#import <UniformTypeIdentifiers/UniformTypeIdentifiers.h>
 
-static NSString * const NXRecoveryAtlasResource = @"recovery_font_18x32";
-
-const CGFloat NXRecoveryFontSize = 13.0;
-static const NSInteger NXRecoveryGlyphScale = 1;
-
-static const CGFloat NXRecoveryMargin = 0.0;
-static const CGFloat NXRecoveryMenuFooterGap = 8.0;
-
-static void NXRecoveryReleaseData(void *info, const void *data, size_t size)
-{
-    free((void *)data);
-}
-
+const CGFloat NXRecoveryFontSize=13;
 @implementation NXRecoveryItem
 
 - (instancetype)initWithTitle:(NSString *)title
@@ -44,6 +37,7 @@ static void NXRecoveryReleaseData(void *info, const void *data, size_t size)
     self = [super init];
     if(self)
     {
+        _enabled = YES;
         _title = [title copy];
         _action = [action copy];
     }
@@ -59,416 +53,6 @@ static void NXRecoveryReleaseData(void *info, const void *data, size_t size)
                        action:(NXRecoveryAction)action
 {
     return [[self alloc] initWithTitle:title action:action];
-}
-
-@end
-
-@interface NXRecoveryFontAtlas : NSObject
-
-@property (nonatomic, readonly) NSInteger cellWidth;
-@property (nonatomic, readonly) NSInteger cellHeight;
-
-+ (nullable instancetype)sharedAtlas;
-- (nullable CGImageRef)imageTintedWithColor:(UIColor *)color;
-
-@end
-
-@implementation NXRecoveryFontAtlas
-{
-    NSInteger _width;
-    NSInteger _height;
-    uint8_t *_coverage;
-    NSMutableDictionary<UIColor*, id> *_tinted;
-}
-
-+ (instancetype)sharedAtlas
-{
-    static NXRecoveryFontAtlas *atlas;
-    static dispatch_once_t once;
-    dispatch_once(&once, ^{
-        atlas = [[self alloc] initWithResource:NXRecoveryAtlasResource];
-    });
-    return atlas;
-}
-
-- (instancetype)initWithResource:(NSString *)name
-{
-    self = [super init];
-    if(self == nil)
-    {
-        return nil;
-    }
-    
-    NSBundle *bundle = [NSBundle bundleForClass:self.class];
-    NSString *path = [bundle pathForResource:name ofType:@"png"];
-    CGImageRef cg = (path != nil) ? [UIImage imageWithContentsOfFile:path].CGImage : NULL;
-    if(cg == NULL)
-    {
-        return nil;
-    }
-    
-    _width = (NSInteger)CGImageGetWidth(cg);
-    _height = (NSInteger)CGImageGetHeight(cg);
-    if(_width < 96 || (_width % 96) != 0 || (_height % 2) != 0)
-    {
-        return nil;
-    }
-    
-    _coverage = calloc((size_t)(_width * _height), 1);
-    if(_coverage == NULL)
-    {
-        return nil;
-    }
-    
-    CGColorSpaceRef gray = CGColorSpaceCreateDeviceGray();
-    CGContextRef ctx = CGBitmapContextCreate(_coverage, (size_t)_width, (size_t)_height, 8, (size_t)_width, gray, (CGBitmapInfo)kCGImageAlphaNone);
-    CGColorSpaceRelease(gray);
-    if(ctx == NULL)
-    {
-        free(_coverage);
-        _coverage = NULL;
-        return nil;
-    }
-    
-    CGContextDrawImage(ctx, CGRectMake(0, 0, _width, _height), cg);
-    CGContextRelease(ctx);
-    
-    _tinted = [NSMutableDictionary dictionary];
-    return self;
-}
-
-- (void)dealloc
-{
-    free(_coverage);
-}
-
-- (NSInteger)cellWidth
-{
-    return _width / 96;
-}
-
-- (NSInteger)cellHeight
-{
-    return _height / 2;
-}
-
-- (CGImageRef)imageTintedWithColor:(UIColor *)color
-{
-    if(color == nil)
-    {
-        return NULL;
-    }
-    
-    id cached = _tinted[color];
-    if(cached != nil)
-    {
-        return (__bridge CGImageRef)cached;
-    }
-    
-    CGFloat r = 0.0, g = 0.0, b = 0.0, a = 1.0;
-    if(![color getRed:&r green:&g blue:&b alpha:&a])
-    {
-        return NULL;
-    }
-    
-    size_t count = (size_t)(_width * _height);
-    uint8_t *rgba = malloc(count * 4);
-    if(rgba == NULL)
-    {
-        return NULL;
-    }
-    
-    for(size_t i = 0; i < count; i++)
-    {
-        uint8_t cov = _coverage[i];
-        rgba[i * 4 + 0] = (uint8_t)lround(r * cov);
-        rgba[i * 4 + 1] = (uint8_t)lround(g * cov);
-        rgba[i * 4 + 2] = (uint8_t)lround(b * cov);
-        rgba[i * 4 + 3] = cov;
-    }
-    
-    CGDataProviderRef provider = CGDataProviderCreateWithData(NULL, rgba, count * 4, NXRecoveryReleaseData);
-    CGColorSpaceRef rgb = CGColorSpaceCreateDeviceRGB();
-    CGBitmapInfo bitmapInfo = (CGBitmapInfo)kCGImageAlphaPremultipliedLast | kCGBitmapByteOrderDefault;
-    CGImageRef image = CGImageCreate((size_t)_width, (size_t)_height, 8, 32, (size_t)(_width * 4), rgb, bitmapInfo, provider, NULL, false, kCGRenderingIntentDefault);
-    CGColorSpaceRelease(rgb);
-    CGDataProviderRelease(provider);
-    
-    if(image == NULL)
-    {
-        return NULL;
-    }
-    
-    _tinted[color] = (__bridge_transfer id)image;
-    return image;
-}
-
-@end
-
-@interface NXRecoveryGlyphView : UIView
-
-@property (nonatomic, copy) NSString *text;
-@property (nonatomic) BOOL bold;
-@property (nonatomic, strong) UIColor *color;
-@property (nonatomic) NSInteger glyphScale;
-@property (nonatomic) BOOL wraps;
-
-- (CGSize)cellSizeInPoints;
-
-@end
-
-@implementation NXRecoveryGlyphView
-{
-    NSData *_bytes;
-    NSArray<NSValue *> *_lines;
-    CGFloat _lastWidth;
-}
-
-- (instancetype)initWithFrame:(CGRect)frame
-{
-    self = [super initWithFrame:frame];
-    if(self)
-    {
-        self.opaque = NO;
-        self.backgroundColor = [UIColor clearColor];
-        self.contentMode = UIViewContentModeRedraw;
-        _glyphScale = NXRecoveryGlyphScale;
-        _lastWidth = -1.0;
-        [self setContentHuggingPriority:UILayoutPriorityRequired forAxis:UILayoutConstraintAxisVertical];
-    }
-    return self;
-}
-
-- (void)invalidateGlyphs
-{
-    _lines = nil;
-    [self invalidateIntrinsicContentSize];
-    [self setNeedsDisplay];
-}
-
-- (void)setText:(NSString *)text
-{
-    if(_text == text || [_text isEqualToString:text])
-    {
-        return;
-    }
-    _text = [text copy];
-    _bytes = [(_text ?: @"") dataUsingEncoding:NSUTF8StringEncoding];
-    [self invalidateGlyphs];
-}
-
-- (void)setBold:(BOOL)bold
-{
-    if(_bold != bold)
-    {
-        _bold = bold;
-        [self setNeedsDisplay];
-    }
-}
-
-- (void)setColor:(UIColor *)color
-{
-    _color = color;
-    [self setNeedsDisplay];
-}
-
-- (void)setGlyphScale:(NSInteger)glyphScale
-{
-    _glyphScale = MAX((NSInteger)1, glyphScale);
-    [self invalidateGlyphs];
-}
-
-- (void)setWraps:(BOOL)wraps
-{
-    if(_wraps != wraps)
-    {
-        _wraps = wraps;
-        [self invalidateGlyphs];
-    }
-}
-
-- (CGFloat)displayScaleValue
-{
-    CGFloat scale = self.traitCollection.displayScale;
-    if(scale <= 0.0)
-    {
-        scale = UIScreen.mainScreen.scale;
-    }
-    return (scale > 0.0) ? scale : 1.0;
-}
-
-- (CGSize)cellSizeInPoints
-{
-    NXRecoveryFontAtlas *atlas = [NXRecoveryFontAtlas sharedAtlas];
-    if(atlas == nil)
-    {
-        return CGSizeZero;
-    }
-    
-    CGFloat k = (CGFloat)self.glyphScale / [self displayScaleValue];
-    return CGSizeMake(atlas.cellWidth * k, atlas.cellHeight * k);
-}
-
-- (NSArray<NSValue *> *)glyphLines
-{
-    if(_lines != nil)
-    {
-        return _lines;
-    }
-    
-    NSMutableArray<NSValue *> *lines = [NSMutableArray array];
-    const uint8_t *b = _bytes.bytes;
-    NSUInteger len = _bytes.length;
-    
-    CGFloat cellWidth = [self cellSizeInPoints].width;
-    NSUInteger columns = NSUIntegerMax;
-    if(self.wraps && cellWidth > 0.0 && CGRectGetWidth(self.bounds) > 0.0)
-    {
-        NSInteger fit = (NSInteger)floor(CGRectGetWidth(self.bounds) / cellWidth);
-        columns = (NSUInteger)MAX((NSInteger)1, fit);
-    }
-    
-    NSUInteger start = 0;
-    for(NSUInteger i = 0; i <= len; i++)
-    {
-        BOOL hardBreak = (i < len && b[i] == '\n');
-        BOOL full = (i > start) && ((i - start) == columns);
-        if(i == len || hardBreak || full)
-        {
-            [lines addObject:[NSValue valueWithRange:NSMakeRange(start, i - start)]];
-            start = hardBreak ? (i + 1) : i;
-            if(i == len)
-            {
-                break;
-            }
-        }
-    }
-    
-    if(lines.count == 0)
-    {
-        [lines addObject:[NSValue valueWithRange:NSMakeRange(0, 0)]];
-    }
-    
-    _lines = [lines copy];
-    return _lines;
-}
-
-- (void)layoutSubviews
-{
-    [super layoutSubviews];
-    
-    if(self.wraps && fabs(CGRectGetWidth(self.bounds) - _lastWidth) > 0.5)
-    {
-        _lastWidth = CGRectGetWidth(self.bounds);
-        [self invalidateGlyphs];
-    }
-}
-
-- (CGSize)intrinsicContentSize
-{
-    CGSize cell = [self cellSizeInPoints];
-    NSArray<NSValue *> *lines = [self glyphLines];
-    
-    CGFloat width = UIViewNoIntrinsicMetric;
-    if(!self.wraps)
-    {
-        NSUInteger longest = 0;
-        for(NSValue *v in lines)
-        {
-            longest = MAX(longest, v.rangeValue.length);
-        }
-        width = cell.width * (CGFloat)longest;
-    }
-    
-    return CGSizeMake(width, cell.height * (CGFloat)MAX((NSUInteger)1, lines.count));
-}
-
-- (void)traitCollectionDidChange:(UITraitCollection *)previous
-{
-    [super traitCollectionDidChange:previous];
-    
-    if(previous.displayScale != self.traitCollection.displayScale)
-    {
-        [self invalidateGlyphs];
-    }
-}
-
-- (void)drawRect:(CGRect)rect
-{
-    UIColor *ink = self.color ?: UIColor.whiteColor;
-    NXRecoveryFontAtlas *atlas = [NXRecoveryFontAtlas sharedAtlas];
-    NSArray<NSValue *> *lines = [self glyphLines];
-    CGSize cell = [self cellSizeInPoints];
-    if(atlas == nil)
-    {
-        return;
-    }
-    
-    CGImageRef tinted = [atlas imageTintedWithColor:ink];
-    if(tinted == NULL)
-    {
-        return;
-    }
-    
-    CGContextRef ctx = UIGraphicsGetCurrentContext();
-    CGContextSetShouldAntialias(ctx, NO);
-    CGContextSetInterpolationQuality(ctx, kCGInterpolationNone);
-    
-    const uint8_t *b = _bytes.bytes;
-    CGFloat limit = CGRectGetWidth(self.bounds);
-    for(NSUInteger li = 0; li < lines.count; li++)
-    {
-        NSRange line = lines[li].rangeValue;
-        CGFloat y = cell.height * (CGFloat)li;
-        CGFloat x = 0.0;
-        for(NSUInteger i = 0; i < line.length && x < limit; i++)
-        {
-            NSInteger off = (NSInteger)b[line.location + i] - 32;
-            if(off >= 0 && off < 96)
-            {
-                CGRect src = CGRectMake(off * atlas.cellWidth, self.bold ? atlas.cellHeight : 0, atlas.cellWidth, atlas.cellHeight);
-                CGImageRef glyph = CGImageCreateWithImageInRect(tinted, src);
-                if(glyph != NULL)
-                {
-                    [[UIImage imageWithCGImage:glyph] drawInRect:CGRectMake(x, y, cell.width, cell.height)];
-                    CGImageRelease(glyph);
-                }
-            }
-            x += cell.width;
-        }
-    }
-}
-
-@end
-
-@interface NXRecoveryRow : NSObject
-
-@property (nonatomic, strong) UIView *bar;
-@property (nonatomic, strong) NXRecoveryGlyphView *glyph;
-
-@end
-
-@implementation NXRecoveryRow
-@end
-
-@interface NXRecoveryLogLine : NSObject
-
-@property (nonatomic, copy) NSString *text;
-@property (nonatomic) NXRecoveryLogLevel level;
-
-+ (instancetype)lineWithText:(NSString *)text level:(NXRecoveryLogLevel)level;
-
-@end
-
-@implementation NXRecoveryLogLine
-
-+ (instancetype)lineWithText:(NSString *)text
-                       level:(NXRecoveryLogLevel)level
-{
-    NXRecoveryLogLine *line = [self new];
-    line.text = text;
-    line.level = level;
-    return line;
 }
 
 @end
@@ -502,771 +86,260 @@ static void NXRecoveryReleaseData(void *info, const void *data, size_t size)
 
 @end
 
-@interface NXRecoveryViewController ()
+@interface NXRecoveryPage : NSObject
+@property NSString *header, *instructions;
+@property NSArray<NXRecoveryItem *> *items;
+@property NSInteger index;
+@property (copy) NXRecoveryIndexHandler select, move;
+@end
+@implementation NXRecoveryPage @end
 
-@property (nonatomic, strong) NXRecoveryGlyphView *headerView;
-@property (nonatomic, strong) NXRecoveryGlyphView *instructionsView;
-@property (nonatomic, strong) UIStackView *menuStack;
-@property (nonatomic, strong) UIStackView *footerStack;
-
-@property (nonatomic, strong) NSMutableArray<NXRecoveryRow*> *rows;
-@property (nonatomic, strong) NSMutableArray<UIView*> *decor;
-@property (nonatomic, strong) NSMutableArray<NXRecoveryItem*> *mutableItems;
-
-@property (nonatomic) NSInteger menuOffset;
-@property (nonatomic) NSInteger visibleWindow;
-@property (nonatomic) NSInteger menuWindow;
-
-@property (nonatomic, strong) NSMutableArray<NXRecoveryLogLine*> *logLines;
-@property (nonatomic, strong) NSMutableArray<NXRecoveryGlyphView*> *logRows;
-@property (nonatomic, strong) UIFont *logFont;
-
+@interface NXRecoveryViewController () <UIDocumentPickerDelegate>
+@property NXRecoverySurface *surface;
+@property NSMutableArray<NXRecoveryItem *> *mutableItems;
+@property NSMutableArray<NXRecoveryPage *> *pages;
+@property NSMutableArray<NSAttributedString *> *logLines;
+@property NSString *headerText, *instructionsText;
 @property (nonatomic, readwrite, getter=isRecoveryActive) BOOL recoveryActive;
-@property (nonatomic, copy, nullable) NXRecoveryIndexHandler onSelect;
-@property (nonatomic, copy, nullable) NXRecoveryIndexHandler onMove;
-
-@property (nonatomic, copy, nullable) NSString *browserRoot;
-@property (nonatomic, copy, nullable) NSString *browserHeader;
-@property (nonatomic, copy, nullable) NSString *browserPath;
-@property (nonatomic, copy, nullable) NXRecoveryAction browserOnBack;
-@property (nonatomic, copy, nullable) NXRecoveryFileHandler browserOnFile;
-
 @property (nonatomic, readwrite, getter=isConsoleActive) BOOL consoleActive;
-@property (nonatomic, copy, nullable) NXRecoveryAction consoleSelectAction;
-@property (nonatomic) NSInteger savedLogMax;
-@property (nonatomic, strong) NSLayoutConstraint *menuFooterConstraint;
-@property (nonatomic, strong) NSLayoutConstraint *consoleTopConstraint;
-
+@property (nonatomic, readwrite, getter=isTerminalActive) BOOL terminalActive;
+@property (copy) NXRecoveryIndexHandler onSelect, onMove;
+@property (copy) NXRecoveryAction consoleSelectAction;
+@property NSInteger savedLogMax;
+@property (copy) NSString *browserRoot, *browserHeader, *browserPath;
+@property (copy) NXRecoveryAction browserOnBack;
+@property (copy) NXRecoveryFileHandler browserOnFile;
+/* TWRP's file manager (filemanagerlist and the pages behind it) */
+@property BOOL fmActive, fmTargetIsFolder, fmInputPage;
+@property (copy) NSString *fmRoot, *fmListPath, *fmTarget;
+@property (copy) NXRecoveryAction fmOnBack;
+@property NSInteger fmPending;      /* the copy or move choosedestinationfolder picks for */
+@property (readonly) BOOL fmPickingDestination;
+- (void)fmShowList;
+- (void)fmShowOptions;
+- (void)fmShowOptionsForPath:(NSString *)path folder:(BOOL)folder;
+- (void)fmConfirmDestination:(NSString *)folder;
 @end
 
+typedef NS_ENUM(NSInteger, NXRecoveryFileOperation) {
+    NXRecoveryFileCopy,
+    NXRecoveryFileMove,
+    NXRecoveryFileChmod,
+    NXRecoveryFileDelete,
+    NXRecoveryFileRename,
+};
+
 @implementation NXRecoveryViewController
-
-+ (UIColor *)rgbR:(CGFloat)r
-                g:(CGFloat)g
-                b:(CGFloat)b
-{
-    return [UIColor colorWithRed:r green:g blue:b alpha:1.0];
-}
-
-+ (UIColor *)recoveryBackgroundColor
-{
-    return [self rgbR:0.0 g:0.0 b:0.0];
-}
-
-+ (UIColor *)recoveryHeaderColor
-{
-    /* HEADER */
-    return [self rgbR:247/255.0 g:0.0 b:6/255.0];
-}
-
-+ (UIColor *)recoveryInfoColor
-{
-    /* INFO */
-    return [self rgbR:249/255.0 g:194/255.0 b:0.0];
-}
-
-+ (UIColor *)recoveryItemColor
-{
-    /* MENU */
-    return [self rgbR:0.0 g:106/255.0 b:157/255.0];
-}
-
-+ (UIColor *)recoveryHighlightColor
-{
-    /* MENU_SEL_BG */
-    return [self rgbR:0.0 g:106/255.0 b:157/255.0];
-}
-
-+ (UIColor *)recoveryHighlightTextColor
-{
-    /* MENU_SEL_FG */
-    return [self rgbR:1.0 g:1.0 b:1.0];
-}
-
-+ (UIColor *)recoveryFooterColor
-{
-    return [self rgbR:0.5 g:0.5 b:0.5];
-}
-
-+ (UIColor *)recoveryLogInfoColor
-{
-    /* LOG */
-    return [self rgbR:196/255.0 g:196/255.0 b:196/255.0];
-}
-
-+ (UIColor *)recoveryLogErrorColor
-{
-    /* Nyxian addition since AOSP's text log has no severity =3 */
-    return [self rgbR:1.0 g:0.27 b:0.27];
-}
-
-- (instancetype)initWithNibName:(NSString *)nib
-                         bundle:(NSBundle *)bundle
-{
-    self = [super initWithNibName:nib bundle:bundle];
-    if(self)
-    {
-        _rows = [NSMutableArray array];
-        _decor = [NSMutableArray array];
-        _mutableItems = [NSMutableArray array];
-        _logLines = [NSMutableArray array];
-        _logRows = [NSMutableArray array];
-        _recoveryIndex = 0;
-        _recoveryLogMax = 30;
-        _recoveryActive = NO;
-        _menuOffset = 0;
-        _visibleWindow = 0;
-        _menuWindow = 0;
++ (UIColor *)recoveryBackgroundColor { return [UIColor colorWithWhite:26/255.0 alpha:1]; }
++ (UIColor *)recoveryHeaderColor { return [UIColor colorWithRed:0 green:144/255.0 blue:202/255.0 alpha:1]; }
++ (UIColor *)recoveryInfoColor { return UIColor.whiteColor; }
++ (UIColor *)recoveryItemColor { return UIColor.whiteColor; }
++ (UIColor *)recoveryHighlightColor { return self.recoveryHeaderColor; }
++ (UIColor *)recoveryHighlightTextColor { return UIColor.whiteColor; }
++ (UIColor *)recoveryFooterColor { return [UIColor colorWithWhite:0.8 alpha:1]; }
++ (UIColor *)recoveryLogInfoColor { return [UIColor colorWithWhite:0.93 alpha:1]; }
++ (UIColor *)recoveryLogErrorColor { return [UIColor colorWithRed:1 green:0.25 blue:0.25 alpha:1]; }
+- (instancetype)initWithNibName:(NSString *)nib bundle:(NSBundle *)bundle {
+    if((self=[super initWithNibName:nib bundle:bundle])) {
+        _mutableItems=[NSMutableArray array]; _pages=[NSMutableArray array]; _logLines=[NSMutableArray array];
+        _headerText=@"Nyxian Recovery"; _instructionsText=@""; _recoveryLogMax=30;
     }
     return self;
 }
-
-- (void)createRecoveryView
-{
-    [self loadViewIfNeeded];
+- (void)loadView { self.surface=[NXRecoverySurface new]; self.view=self.surface; }
+- (void)viewDidLoad {
+    [super viewDidLoad]; self.view.hidden=YES;
+    __weak typeof(self) weakSelf=self;
+    self.surface.onSelect=^(NSInteger index) { NXRecoveryViewController *c=weakSelf;
+        if(!c || c.consoleActive || index<0 || index>=(NSInteger)c.mutableItems.count || !c.mutableItems[index].enabled) return;
+        c->_recoveryIndex=index; [c performRecoverySelect];
+    };
+    self.surface.onBack=^{ [weakSelf goBack]; };
+    self.surface.onHome=^{ [weakSelf goHome]; };
+    self.surface.onComplete=^{ [weakSelf finishOperation]; };
+    [self renderPage];
 }
-
-- (NXRecoveryGlyphView *)makeGlyphViewWrapping:(BOOL)wraps
-                                         color:(UIColor *)color
-                                          bold:(BOOL)bold
-{
-    NXRecoveryGlyphView *v = [NXRecoveryGlyphView new];
-    v.translatesAutoresizingMaskIntoConstraints = NO;
-    v.glyphScale = NXRecoveryGlyphScale;
-    v.wraps = wraps;
-    v.color = color;
-    v.bold = bold;
-    return v;
-}
-
-- (void)viewDidLoad
-{
-    [super viewDidLoad];
-    
-    self.view.backgroundColor = [self.class recoveryBackgroundColor];
-    self.view.hidden = YES;
-    
-    NXRecoveryGlyphView *header = [self makeGlyphViewWrapping:YES color:[self.class recoveryInfoColor] bold:YES];
-    header.text = @"Nyxian Recovery";
-    [self.view addSubview:header];
-    self.headerView = header;
-    
-    NXRecoveryGlyphView *instructions = [self makeGlyphViewWrapping:YES color:[self.class recoveryInfoColor] bold:NO];
-    instructions.text = @"Use volume up/down and hold both volume keys.";
-    [self.view addSubview:instructions];
-    self.instructionsView = instructions;
-    
-    UIStackView *stack = [UIStackView new];
-    stack.translatesAutoresizingMaskIntoConstraints = NO;
-    stack.axis = UILayoutConstraintAxisVertical;
-    stack.alignment = UIStackViewAlignmentFill;
-    stack.distribution = UIStackViewDistributionFill;
-    stack.spacing = 0;
-    [self.view addSubview:stack];
-    self.menuStack = stack;
-    
-    UIStackView *footer = [UIStackView new];
-    footer.translatesAutoresizingMaskIntoConstraints = NO;
-    footer.axis = UILayoutConstraintAxisVertical;
-    footer.alignment = UIStackViewAlignmentFill;
-    footer.distribution = UIStackViewDistributionFill;
-    footer.spacing = 0;
-    [self.view addSubview:footer];
-    self.footerStack = footer;
-    
-    UILayoutGuide *guide = self.view.safeAreaLayoutGuide;
-    
-    self.menuFooterConstraint = [stack.bottomAnchor constraintLessThanOrEqualToAnchor:footer.topAnchor constant:-NXRecoveryMenuFooterGap];
-    self.consoleTopConstraint = [footer.topAnchor constraintGreaterThanOrEqualToAnchor:guide.topAnchor constant:12];
-    footer.clipsToBounds = YES;
-    
-    [NSLayoutConstraint activateConstraints:@[
-        [header.topAnchor constraintEqualToAnchor:guide.topAnchor constant:12],
-        [header.leadingAnchor constraintEqualToAnchor:guide.leadingAnchor constant:NXRecoveryMargin],
-        [header.trailingAnchor constraintEqualToAnchor:guide.trailingAnchor],
-        
-        [instructions.topAnchor constraintEqualToAnchor:header.bottomAnchor constant:0],
-        [instructions.leadingAnchor constraintEqualToAnchor:guide.leadingAnchor constant:NXRecoveryMargin],
-        [instructions.trailingAnchor constraintEqualToAnchor:guide.trailingAnchor],
-        
-        [stack.topAnchor constraintEqualToAnchor:instructions.bottomAnchor constant:4],
-        [stack.leadingAnchor constraintEqualToAnchor:guide.leadingAnchor constant:NXRecoveryMargin],
-        [stack.trailingAnchor constraintEqualToAnchor:guide.trailingAnchor constant:0],
-        self.menuFooterConstraint,
-        
-        [footer.bottomAnchor constraintEqualToAnchor:guide.bottomAnchor constant:-12],
-        [footer.leadingAnchor constraintEqualToAnchor:guide.leadingAnchor constant:NXRecoveryMargin],
-        [footer.trailingAnchor constraintEqualToAnchor:guide.trailingAnchor],
-    ]];
-}
-
-- (void)viewDidLayoutSubviews
-{
-    [super viewDidLayoutSubviews];
-    
-    if(self.consoleActive)
-    {
-        if([self trimRecoveryLog])
-        {
-            [self paintRecoveryLog];
-        }
-        return;
-    }
-    if(self.mutableItems.count == 0)
-    {
-        return;
-    }
-    if([self effectiveMenuWindow] != self.visibleWindow)
-    {
-        [self rebuildMenuRows];
-    }
-}
-
-- (void)traitCollectionDidChange:(UITraitCollection *)previous
-{
-    [super traitCollectionDidChange:previous];
-    
-    if(previous.displayScale != self.traitCollection.displayScale)
-    {
-        [self rebuildMenuRows];
-        [self paintRecoveryLog];
-    }
-}
-
-- (void)attachToViewController:(UIViewController *)parent
-{
-    if(parent == nil)
-    {
-        return;
-    }
-    
-    [parent addChildViewController:self];
-    
-    self.view.translatesAutoresizingMaskIntoConstraints = NO;
-    [parent.view addSubview:self.view];
-    
-    [NSLayoutConstraint activateConstraints:@[
-        [self.view.topAnchor constraintEqualToAnchor:parent.view.topAnchor],
+- (void)createRecoveryView { [self loadViewIfNeeded]; }
+- (BOOL)prefersStatusBarHidden { return YES; }
+- (void)attachToViewController:(UIViewController *)parent {
+    if(!parent) return;
+    [parent addChildViewController:self]; self.view.translatesAutoresizingMaskIntoConstraints=NO; [parent.view addSubview:self.view];
+    [NSLayoutConstraint activateConstraints:@[[self.view.topAnchor constraintEqualToAnchor:parent.view.topAnchor],
         [self.view.bottomAnchor constraintEqualToAnchor:parent.view.bottomAnchor],
         [self.view.leadingAnchor constraintEqualToAnchor:parent.view.leadingAnchor],
-        [self.view.trailingAnchor constraintEqualToAnchor:parent.view.trailingAnchor],
-    ]];
-    
+        [self.view.trailingAnchor constraintEqualToAnchor:parent.view.trailingAnchor]]];
     [self didMoveToParentViewController:parent];
 }
-
-- (BOOL)prefersStatusBarHidden
-{
-    return YES;
+- (void)renderPage {
+    NSMutableArray *titles=[NSMutableArray array], *enabled=[NSMutableArray array], *checks=[NSMutableArray array], *paths=[NSMutableArray array];
+    for(NXRecoveryItem *item in self.mutableItems) { [titles addObject:item.title?:@""]; [enabled addObject:@(item.enabled)]; [checks addObject:@(item.toggle?((item.radio?2:0)+(item.checked?1:0)):-1)]; [paths addObject:item.filePath?:@""]; }
+    BOOL home=[self.headerText isEqual:@"Nyxian Recovery"] || [self.headerText hasPrefix:@"Nyxian Recovery\n"];
+    BOOL confirmation=self.mutableItems.count==2 && [self.mutableItems.firstObject.title isEqual:@"Cancel"] && !self.fmInputPage;
+    NSString *instructions=self.instructionsText;
+    for(NXRecoveryItem *item in self.mutableItems)if(item.toggle && !item.radio && ![self.headerText hasPrefix:@"Wipe"]){instructions=[NSString stringWithFormat:@"%@%@Theme: %@",instructions?:@"",instructions.length?@"\n":@"",NXTWRPThemeStore.activeName];break;}
+    [self.surface showHeader:self.headerText instructions:instructions titles:titles enabled:enabled checks:checks browserPath:self.browserPath filePaths:paths selected:self.recoveryIndex
+                       home:home confirmation:confirmation canGoBack:self.pages.count>0 || self.browserPath!=nil];
 }
-
-- (void)setRecoveryHeader:(NSString *)text
-{
-    [self createRecoveryView];
-    self.headerView.text = text ?: @"";
+- (NXRecoveryPage *)snapshot {
+    NXRecoveryPage *p=[NXRecoveryPage new]; p.header=self.headerText; p.instructions=self.instructionsText;
+    p.items=self.mutableItems.copy; p.index=self.recoveryIndex; p.select=self.onSelect; p.move=self.onMove; return p;
 }
-
-- (void)setRecoveryInstructions:(NSString *)text
-{
-    [self createRecoveryView];
-    self.instructionsView.text = text ?: @"";
+- (void)restorePage:(NXRecoveryPage *)p {
+    self.headerText=p.header; self.instructionsText=p.instructions; [self.mutableItems setArray:p.items];
+    _recoveryIndex=p.index; self.onSelect=p.select; self.onMove=p.move; self.browserPath=nil;
+    self.fmActive=NO; self.fmInputPage=NO;
+    [self renderPage];
 }
-
-- (void)setRecoveryFooter:(NSString *)text
-{
-    [self createRecoveryView];
-    [self.logLines removeAllObjects];
-    if(text.length > 0)
-    {
-        [self.logLines addObject:[NXRecoveryLogLine lineWithText:text level:NXRecoveryLogLevelInfo]];
+- (void)goBack {
+    if(self.consoleActive) return;
+    if(self.terminalActive) { [self exitTerminal]; return; }
+    /* Confirmation pages must run Cancel to release a worker waiting for an answer. */
+    if(self.mutableItems.count==2 && [self.mutableItems.firstObject.title isEqual:@"Cancel"]) {
+        self.recoveryIndex=0; [self performRecoverySelect]; return;
     }
+    if(self.browserPath) {
+        if(![self.browserPath isEqualToString:self.browserRoot]) {
+            [self browsePath:[self fmParentOfPath:self.browserPath]];
+        } else {
+            NXRecoveryAction onBack=self.browserOnBack;self.browserPath=nil;
+            if(onBack)onBack(self);
+            else if(self.pages.count){NXRecoveryPage *p=self.pages.lastObject;[self.pages removeLastObject];[self restorePage:p];}
+            else [self exitRecovery];
+        }
+        return;
+    }
+    /* Choose Action goes back to the list (its name/permissions inputs and confirmations run Cancel above) */
+    if(self.fmActive) { [self fmShowList]; return; }
+    NXRecoveryPage *p=self.pages.lastObject; if(!p) return; [self.pages removeLastObject]; [self restorePage:p];
+}
+- (void)goHome {
+    if(self.consoleActive) return;
+    if(self.terminalActive) [self exitTerminal];
+    if(self.mutableItems.count==2 && [self.mutableItems.firstObject.title isEqual:@"Cancel"]) { [self goBack]; return; }
+    NXRecoveryPage *p=self.pages.firstObject; if(!p) return; [self.pages removeAllObjects]; [self restorePage:p];
+}
+- (void)setRecoveryHeader:(NSString *)text { [self createRecoveryView]; self.headerText=text?:@""; [self renderPage]; }
+- (void)setRecoveryInstructions:(NSString *)text { [self createRecoveryView]; self.instructionsText=text?:@""; [self renderPage]; }
+- (void)setRecoveryFooter:(NSString *)text { [self clearRecoveryLog]; if(text.length) [self recoveryLog:text]; }
+- (NSArray<NXRecoveryItem *> *)recoveryItems { return self.mutableItems.copy; }
+- (void)setRecoveryItems:(NSArray<NXRecoveryItem *> *)items {
+    [self createRecoveryView];NSInteger previous=self.recoveryIndex;
+    [self.mutableItems setArray:items?:@[]];_recoveryIndex=[self.headerText isEqual:@"Settings"]?MIN(previous,MAX(0,(NSInteger)self.mutableItems.count-1)):0;[self renderPage];
+}
+- (void)setRecoveryIndex:(NSInteger)index {
+    NSInteger count=self.mutableItems.count; _recoveryIndex=count?((index%count)+count)%count:0;
+    [self.surface setSelectedIndex:_recoveryIndex];
+}
+- (NXRecoveryItem *)currentRecoveryItem {
+    return self.recoveryIndex>=0 && self.recoveryIndex<(NSInteger)self.mutableItems.count?self.mutableItems[self.recoveryIndex]:nil;
+}
+- (void)showRecovery:(BOOL)visible { [self createRecoveryView]; [self.view.superview bringSubviewToFront:self.view]; self.view.hidden=!visible; }
+- (void)enterRecoveryWithHeader:(NSString *)header instructions:(NSString *)instructions footer:(NSString *)footer
+                         items:(NSArray<NXRecoveryItem *> *)items onSelect:(NXRecoveryIndexHandler)onSelect onMove:(NXRecoveryIndexHandler)onMove {
+    [self createRecoveryView]; if(self.consoleActive) [self exitConsole]; if(self.terminalActive) [self exitTerminal];
+    if([header isEqual:@"Nyxian Recovery"] || [header hasPrefix:@"Nyxian Recovery\n"]) [self.pages removeAllObjects];
+    else if(self.recoveryActive && ![header isEqual:self.headerText]) [self.pages addObject:[self snapshot]];
+    self.browserPath=nil; self.headerText=header?:self.headerText; self.instructionsText=instructions?:@"";
+    self.fmActive=NO; self.fmInputPage=NO;
+    [self.mutableItems setArray:items?:@[]]; _recoveryIndex=0; self.onSelect=onSelect; self.onMove=onMove;
+    if(footer) [self setRecoveryFooter:footer]; self.recoveryActive=YES; [self renderPage]; [self showRecovery:YES];
+}
+- (void)enterTerminal {
+    [self createRecoveryView]; if(self.consoleActive) [self exitConsole];
+    self.terminalActive=YES; [self.surface setTerminal:YES]; [self showRecovery:YES];
+}
+- (void)exitTerminal {
+    if(!self.terminalActive) return;
+    self.terminalActive=NO; [self.surface setTerminal:NO]; [self renderPage];
+}
+- (void)exitRecovery { if(self.terminalActive) [self exitTerminal]; self.recoveryActive=NO; [NXVolumeButtonMonitor disarm]; [self showRecovery:NO]; }
+- (void)focusWipeConfirmation { [self.surface focusCertificatePassword]; }
+- (void)performRecoverySelect {
+    if ([self.headerText isEqual:@"Wipe\nFormat Data"] && self.recoveryIndex==1 && ![self.surface formatDataConfirmed]) return;
+    NXRecoveryItem *item=self.currentRecoveryItem; if(!item || !item.enabled) return;
+    if(item.action) item.action(self);
+    if(self.recoveryActive && self.onSelect) self.onSelect(self,self.recoveryIndex,item);
+}
+- (void)setRecoveryLogMax:(NSInteger)maximum { _recoveryLogMax=MAX(1,maximum); [self paintRecoveryLog]; }
+- (void)paintRecoveryLog {
+    while(self.logLines.count>(NSUInteger)self.recoveryLogMax) [self.logLines removeObjectAtIndex:0];
+    NSMutableAttributedString *text=[[NSMutableAttributedString alloc] initWithString:@""];
+    for(NSAttributedString *line in self.logLines) [text appendAttributedString:line];
+    [self.surface setLog:text];
+}
+- (void)recoveryLog:(NSString *)line { [self recoveryLog:line level:NXRecoveryLogLevelInfo]; }
+- (void)recoveryLog:(NSString *)line level:(NXRecoveryLogLevel)level {
+    if(!NSThread.isMainThread) { dispatch_async(dispatch_get_main_queue(),^{ [self recoveryLog:line level:level]; }); return; }
+    [self createRecoveryView];
+    NSDictionary *attributes=@{NSFontAttributeName:[UIFont monospacedSystemFontOfSize:13 weight:UIFontWeightRegular],
+        NSForegroundColorAttributeName:level==NXRecoveryLogLevelError?self.class.recoveryLogErrorColor:self.class.recoveryLogInfoColor};
+    for(NSString *part in [(line?:@"") componentsSeparatedByString:@"\n"])
+        [self.logLines addObject:[[NSAttributedString alloc] initWithString:[part stringByAppendingString:@"\n"] attributes:attributes]];
     [self paintRecoveryLog];
 }
-
-- (CGFloat)px:(CGFloat)pixels
-{
-    CGFloat scale = self.traitCollection.displayScale;
-    if(scale <= 0.0)
-    {
-        scale = UIScreen.mainScreen.scale;
-    }
-    return (scale > 0.0) ? (pixels / scale) : pixels;
+- (void)recoveryLogError:(NSString *)line { [self recoveryLog:line level:NXRecoveryLogLevelError]; }
+- (void)clearRecoveryLog { [self createRecoveryView]; [self.logLines removeAllObjects]; [self paintRecoveryLog]; }
+- (void)importRecoveryTheme {
+    if(self.consoleActive)return;
+    UIDocumentPickerViewController *picker=[[UIDocumentPickerViewController alloc] initForOpeningContentTypes:@[UTTypeZIP] asCopy:YES];
+    picker.delegate=self;picker.allowsMultipleSelection=NO;[self presentViewController:picker animated:YES completion:nil];
 }
-
-- (CGFloat)menuCellHeight
-{
-    NXRecoveryGlyphView *probe = [self makeGlyphViewWrapping:NO color:[self.class recoveryItemColor] bold:NO];
-    return [probe cellSizeInPoints].height;
-}
-
-- (CGFloat)menuRowHeight
-{
-    return [self menuCellHeight] + 2.0 * [self px:2.0];
-}
-
-- (CGFloat)menuRuleGap
-{
-    return [self px:6.0];
-}
-
-- (UIView *)makeRecoveryLine
-{
-    UIView *v = [UIView new];
-    v.translatesAutoresizingMaskIntoConstraints = NO;
-    v.backgroundColor = [self.class recoveryItemColor];
-    [v.heightAnchor constraintEqualToConstant:[self px:2.0]].active = YES;
-    return v;
-}
-
-- (NSArray<NXRecoveryItem *> *)recoveryItems
-{
-    return [self.mutableItems copy];
-}
-
-- (void)setRecoveryItems:(NSArray<NXRecoveryItem *> *)items
-{
-    [self createRecoveryView];
-    
-    [self.mutableItems setArray:(items ?: @[])];
-    
-    _recoveryIndex = 0;
-    _menuOffset = 0;
-    
-    [self rebuildMenuRows];
-}
-
-- (NSInteger)autoMenuWindow
-{
-    CGFloat rowHeight = [self menuRowHeight];
-    if(rowHeight <= 0.0)
-    {
-        return 1;
-    }
-    
-    CGFloat top = CGRectGetMinY(self.menuStack.frame);
-    CGFloat bottom = CGRectGetMinY(self.footerStack.frame) - NXRecoveryMenuFooterGap;
-    
-    if(bottom <= top)
-    {
-        top = 0.0;
-        bottom = CGRectGetHeight(self.view.bounds);
-        if(bottom <= 0.0)
-        {
-            return 1;
-        }
-    }
-    
-    CGFloat chrome = 2.0 * [self px:2.0] + 2.0 * [self menuRuleGap];
-    CGFloat available = (bottom - top) - chrome;
-    if(available < rowHeight)
-    {
-        return 1;
-    }
-    return MAX(1, (NSInteger)floor(available / rowHeight));
-}
-
-- (NSInteger)effectiveMenuWindow
-{
-    NSInteger count = (NSInteger)self.mutableItems.count;
-    if(count == 0)
-    {
-        return 0;
-    }
-    
-    NSInteger window = (self.menuWindow > 0) ? self.menuWindow : [self autoMenuWindow];
-    return MIN(MAX(window, 1), count);
-}
-
-- (void)setMenuWindow:(NSInteger)menuWindow
-{
-    _menuWindow = MAX(0, menuWindow);
-    [self rebuildMenuRows];
-}
-
-- (void)clampMenuOffset
-{
-    NSInteger count = (NSInteger)self.mutableItems.count;
-    NSInteger window = self.visibleWindow;
-    if(count == 0 || window <= 0 || window >= count)
-    {
-        _menuOffset = 0;
-        return;
-    }
-    
-    NSInteger offset = _menuOffset;
-    if(_recoveryIndex < offset)
-    {
-        offset = _recoveryIndex;
-    }
-    else if(_recoveryIndex >= offset + window)
-    {
-        offset = _recoveryIndex - window + 1;
-    }
-    
-    _menuOffset = MIN(MAX(offset, 0), count - window);
-}
-
-- (void)styleRow:(NXRecoveryRow *)row
-     highlighted:(BOOL)highlighted
-{
-    row.bar.backgroundColor = highlighted ? [self.class recoveryHighlightColor] : [UIColor clearColor];
-    row.glyph.color = highlighted ? [self.class recoveryHighlightTextColor] : [self.class recoveryItemColor];
-    row.glyph.bold = highlighted;
-}
-
-- (void)applyMenuWindow
-{
-    [self clampMenuOffset];
-    
-    NSInteger count = (NSInteger)self.mutableItems.count;
-    for(NSInteger slot = 0; slot < (NSInteger)self.rows.count; slot++)
-    {
-        NSInteger index = self.menuOffset + slot;
-        NXRecoveryRow *row = self.rows[slot];
-        
-        if(index < 0 || index >= count)
-        {
-            row.glyph.text = @"";
-            [self styleRow:row highlighted:NO];
-            continue;
-        }
-        
-        row.glyph.text = self.mutableItems[index].title;
-        [self styleRow:row highlighted:(index == _recoveryIndex)];
-    }
-}
-
-- (void)rebuildMenuRows
-{
-    [self createRecoveryView];
-    
-    for(NXRecoveryRow *row in self.rows)
-    {
-        [row.bar removeFromSuperview];
-    }
-    [self.rows removeAllObjects];
-    
-    for(UIView *d in self.decor)
-    {
-        [d removeFromSuperview];
-    }
-    [self.decor removeAllObjects];
-    
-    NSInteger window = [self effectiveMenuWindow];
-    self.visibleWindow = window;
-    if(window == 0)
-    {
-        return;
-    }
-    
-    CGFloat rowHeight = [self menuRowHeight];
-    CGFloat cellHeight = [self menuCellHeight];
-    
-    UIView *topLine = [self makeRecoveryLine];
-    [self.menuStack addArrangedSubview:topLine];
-    [self.decor addObject:topLine];
-    [self.menuStack setCustomSpacing:[self menuRuleGap] afterView:topLine];
-    
-    for(NSInteger slot = 0; slot < window; slot++)
-    {
-        UIView *bar = [UIView new];
-        bar.translatesAutoresizingMaskIntoConstraints = NO;
-        bar.backgroundColor = [UIColor clearColor];
-        
-        NXRecoveryGlyphView *glyph = [self makeGlyphViewWrapping:NO color:[self.class recoveryItemColor] bold:NO];
-        [bar addSubview:glyph];
-        [NSLayoutConstraint activateConstraints:@[
-            [bar.heightAnchor constraintEqualToConstant:rowHeight],
-            [glyph.centerYAnchor constraintEqualToAnchor:bar.centerYAnchor],
-            [glyph.heightAnchor constraintEqualToConstant:cellHeight],
-            [glyph.leadingAnchor constraintEqualToAnchor:bar.leadingAnchor constant:[self px:4.0]],
-            [glyph.trailingAnchor constraintEqualToAnchor:bar.trailingAnchor],
-        ]];
-        
-        [self.menuStack addArrangedSubview:bar];
-        
-        NXRecoveryRow *row = [NXRecoveryRow new];
-        row.bar = bar;
-        row.glyph = glyph;
-        [self.rows addObject:row];
-    }
-    
-    UIView *bottomLine = [self makeRecoveryLine];
-    [self.menuStack addArrangedSubview:bottomLine];
-    [self.decor addObject:bottomLine];
-    [self.menuStack setCustomSpacing:[self menuRuleGap] afterView:self.rows.lastObject.bar];
-    
-    [self applyMenuWindow];
-}
-
-- (void)setRecoveryIndex:(NSInteger)index
-{
-    NSInteger count = (NSInteger)self.mutableItems.count;
-    if(count == 0)
-    {
-        _recoveryIndex = 0;
-        _menuOffset = 0;
-        return;
-    }
-    
-    index = ((index % count) + count) % count;
-    if(index == _recoveryIndex)
-    {
-        return;
-    }
-    
-    _recoveryIndex = index;
-    [self applyMenuWindow];
-}
-
-- (NXRecoveryItem *)currentRecoveryItem
-{
-    if(_recoveryIndex < 0 || _recoveryIndex >= (NSInteger)self.mutableItems.count)
-    {
-        return nil;
-    }
-    return self.mutableItems[_recoveryIndex];
-}
-
-- (void)showRecovery:(BOOL)visible
-{
-    [self createRecoveryView];
-    [self.view.superview bringSubviewToFront:self.view];
-    self.view.hidden = !visible;
-}
-
-- (void)enterRecoveryWithHeader:(NSString *)header
-                   instructions:(NSString *)instructions
-                         footer:(NSString *)footer
-                          items:(NSArray<NXRecoveryItem *> *)items
-                       onSelect:(NXRecoveryIndexHandler)onSelect
-                         onMove:(NXRecoveryIndexHandler)onMove
-{
-    [self createRecoveryView];
-    
-    if(header != nil)
-    {
-        [self setRecoveryHeader:header];
-    }
-    [self setRecoveryItems:(items ?: @[])];
-    if(footer != nil)
-    {
-        [self setRecoveryFooter:footer];
-    }
-    if(instructions != nil)
-    {
-        [self setRecoveryInstructions:instructions];
-    }
-    
-    self.onSelect = onSelect;
-    self.onMove = onMove;
-    
-    self.recoveryActive = YES;
-    [self showRecovery:YES];
-    
-    [self armVolumeInput];
-}
-
-- (void)exitRecovery
-{
-    self.recoveryActive = NO;
-    [self disarmVolumeInput];
-    [self showRecovery:NO];
-}
-
-- (void)armVolumeInput
-{
-    __weak typeof(self) weakSelf = self;
-    [NXVolumeButtonMonitor armWithHandler:^(NSInteger button, NSString *kind) {
-        [weakSelf handleButton:button kindString:kind];
+- (void)documentPicker:(UIDocumentPickerViewController *)picker didPickDocumentsAtURLs:(NSArray<NSURL *> *)urls {
+    NSURL *url=urls.firstObject;if(!url)return;
+    [picker dismissViewControllerAnimated:YES completion:^{
+        [self enterConsole];[self recoveryLog:@"Importing recovery theme..."];
+        // Extraction runs off the UI thread. Validation/drawing and activation run on main.
+        dispatch_async(dispatch_get_global_queue(QOS_CLASS_USER_INITIATED,0),^{
+            NSError *error=nil;NSURL *candidate=[NXTWRPThemeStore prepareArchive:url error:&error];
+            dispatch_async(dispatch_get_main_queue(),^{
+                NSError *failure=error;
+                BOOL imported=candidate && [NXTWRPThemeStore activatePreparedTheme:candidate name:url.lastPathComponent error:&failure];
+                if(imported)[self recoveryLog:@"Theme imported. Return to Settings to view it."];
+                else [self recoveryLogError:failure.localizedDescription?:@"Theme could not be imported."];
+                [self finishConsoleWithSelectAction:^(NXRecoveryViewController *c){[c exitConsole];}];
+            });
+        });
     }];
 }
-
-- (void)disarmVolumeInput
-{
-    [NXVolumeButtonMonitor disarm];
+- (void)restoreRecoverySettings {
+    if(self.consoleActive)return;
+    for(NSString *name in @[@"tw_military_time",@"tw_button_vibrate",@"tw_keyboard_vibrate",@"tw_brightness_pct",@"timezone",@"language"])
+        [NSUserDefaults.standardUserDefaults removeObjectForKey:[@"nyxian.recovery." stringByAppendingString:name]];
+    [NSUserDefaults.standardUserDefaults setInteger:50 forKey:@"nyxian.recovery.tw_brightness_pct"];
+    UIScreen.mainScreen.brightness=0.5;
+    [self reloadRecoveryTheme];
 }
-
-- (void)handleButton:(NSInteger)button
-          kindString:(NSString*)kind
-{
-    NXRecoveryEventKind k = [kind isEqualToString:@"select"] ? NXRecoveryEventKindSelect : NXRecoveryEventKindTap;
-    [self handleButton:(NXRecoveryButton)button kind:k];
+- (void)reloadRecoveryTheme {
+    if(self.consoleActive)return;
+    [NSNotificationCenter.defaultCenter postNotificationName:NXTWRPThemeDidChangeNotification object:nil];
+    [self renderPage];
 }
-
-- (void)handleButton:(NXRecoveryButton)button
-                kind:(NXRecoveryEventKind)kind
-{
-    if(!self.recoveryActive)
-    {
-        return;
-    }
-    if(self.consoleActive)
-    {
-        if(kind == NXRecoveryEventKindSelect && self.consoleSelectAction != nil)
-        {
-            NXRecoveryAction action = self.consoleSelectAction;
-            self.consoleSelectAction = nil;
-            action(self);
-        }
-        return;
-    }
-    if(kind == NXRecoveryEventKindSelect)
-    {
-        [self performRecoverySelect];
-    }
-    else
-    {
-        [self moveRecoveryBy:(button == NXRecoveryButtonVolumeUp) ? -1 : 1];
-    }
+- (void)useStockRecoveryTheme {
+    if(self.consoleActive)return;[NXTWRPThemeStore useStockTheme];[self recoveryLog:@"Stock recovery theme selected."];[self renderPage];
 }
-
-- (void)moveRecoveryBy:(NSInteger)delta
-{
-    self.recoveryIndex = self.recoveryIndex + delta;
-    if(self.onMove != nil)
-    {
-        self.onMove(self, self.recoveryIndex, self.currentRecoveryItem);
-    }
+- (void)setOperationProgress:(double)fraction status:(NSString *)status {[self createRecoveryView];[self.surface setOperationProgress:fraction status:status];}
+- (void)clearOperationProgress {[self.surface clearOperationProgress];}
+- (void)enterConsole {
+    [self createRecoveryView]; if(self.consoleActive) return;
+    self.consoleActive=YES; self.consoleSelectAction=nil; self.savedLogMax=self.recoveryLogMax; _recoveryLogMax=1024;
+    [self.surface setConsole:YES completionEnabled:NO]; [self paintRecoveryLog];
 }
-
-- (void)performRecoverySelect
-{
-    NXRecoveryItem *item = self.currentRecoveryItem;
-    if(item == nil)
-    {
-        return;
-    }
-    
-    if(item.action != nil)
-    {
-        item.action(self);
-    }
-    
-    if(self.recoveryActive && self.onSelect != nil)
-    {
-        self.onSelect(self, self.recoveryIndex, item);
-    }
+- (void)finishConsoleWithSelectAction:(NXRecoveryAction)action {
+    [self finishConsoleWithSelectAction:action title:@"Continue" status:@"Complete"];
 }
-
-- (void)setRecoveryLogMax:(NSInteger)recoveryLogMax
-{
-    _recoveryLogMax = MAX(1, recoveryLogMax);
-    [self trimRecoveryLog];
-    [self paintRecoveryLog];
+- (void)finishConsoleWithSelectAction:(NXRecoveryAction)action title:(NSString *)title status:(NSString *)status {
+    if(!self.consoleActive) return; self.consoleSelectAction=action;
+    [self.surface setConsoleCompletionTitle:title status:status]; [self.surface setConsole:YES completionEnabled:action!=nil];
 }
-
-- (NSInteger)rowsForLogText:(NSString *)text
-                     columns:(NSUInteger)columns
-{
-    NSInteger rows = 0;
-    for(NSString *part in [(text ?: @"") componentsSeparatedByString:@"\n"])
-    {
-        NSUInteger len = [part lengthOfBytesUsingEncoding:NSUTF8StringEncoding];
-        rows += MAX((NSInteger)1, (NSInteger)((len + columns - 1) / columns));
-    }
-    return rows;
+- (void)finishOperation {
+    if(!self.consoleActive || !self.consoleSelectAction) return;
+    NXRecoveryAction action=self.consoleSelectAction; self.consoleSelectAction=nil;
+    [self.surface setConsole:YES completionEnabled:NO]; action(self);
 }
-
-- (BOOL)trimRecoveryLog
-{
-    BOOL trimmed = NO;
-    
-    NSInteger over = (NSInteger)self.logLines.count - self.recoveryLogMax;
-    if(over > 0)
-    {
-        [self.logLines removeObjectsInRange:NSMakeRange(0, (NSUInteger)over)];
-        trimmed = YES;
-    }
-    
-    if(!self.consoleActive)
-    {
-        return trimmed;
-    }
-    
-    CGRect frame = self.view.safeAreaLayoutGuide.layoutFrame;
-    CGSize cell = [[self makeGlyphViewWrapping:YES color:UIColor.whiteColor bold:NO] cellSizeInPoints];
-    CGFloat width = CGRectGetWidth(frame) - NXRecoveryMargin;
-    CGFloat height = CGRectGetHeight(frame) - 24.0;
-    if(cell.width <= 0.0 || cell.height <= 0.0 || width <= 0.0 || height <= 0.0)
-    {
-        return trimmed;
-    }
-    
-    NSUInteger columns = (NSUInteger)MAX((NSInteger)1, (NSInteger)floor(width / cell.width));
-    NSInteger capacity = MAX((NSInteger)1, (NSInteger)floor(height / cell.height));
-    
-    NSInteger total = 0;
-    for(NXRecoveryLogLine *line in self.logLines)
-    {
-        total += [self rowsForLogText:line.text columns:columns];
-    }
-    
-    while(total > capacity && self.logLines.count > 1)
-    {
-        total -= [self rowsForLogText:self.logLines.firstObject.text columns:columns];
-        [self.logLines removeObjectAtIndex:0];
-        trimmed = YES;
-    }
-    
-    return trimmed;
+- (void)exitConsole {
+    if(!self.consoleActive) return; self.consoleActive=NO; self.consoleSelectAction=nil; _recoveryLogMax=self.savedLogMax;
+    [self.surface setConsole:NO completionEnabled:NO]; [self renderPage]; [self paintRecoveryLog];
 }
-
-- (UIColor *)logColorForLevel:(NXRecoveryLogLevel)level
-{
-    return (level == NXRecoveryLogLevelError) ? [self.class recoveryLogErrorColor] : [self.class recoveryLogInfoColor];
-}
-
-- (void)paintRecoveryLog
-{
-    [self createRecoveryView];
-    
-    for(NXRecoveryGlyphView *row in self.logRows)
-    {
-        [row removeFromSuperview];
-    }
-    [self.logRows removeAllObjects];
-    
-    for(NXRecoveryLogLine *line in self.logLines)
-    {
-        NXRecoveryGlyphView *v = [self makeGlyphViewWrapping:YES color:[self logColorForLevel:line.level] bold:NO];
-        v.text = line.text;
-        
-        [self.footerStack addArrangedSubview:v];
-        [self.logRows addObject:v];
-    }
-}
-
-- (void)recoveryLog:(NSString *)line
-{
-    [self recoveryLog:line level:NXRecoveryLogLevelInfo];
-}
-
-- (void)recoveryLog:(NSString *)line
-              level:(NXRecoveryLogLevel)level
-{
-    [self createRecoveryView];
-    
-    for(NSString *part in [(line ?: @"") componentsSeparatedByString:@"\n"])
-    {
-        [self.logLines addObject:[NXRecoveryLogLine lineWithText:part level:level]];
-    }
-    
-    [self trimRecoveryLog];
-    [self paintRecoveryLog];
-}
-
-- (void)recoveryLogError:(NSString *)line
-{
-    [self recoveryLog:line level:NXRecoveryLogLevelError];
-}
-
-- (void)clearRecoveryLog
-{
-    [self.logLines removeAllObjects];
-    [self paintRecoveryLog];
-}
-
 - (NSFileManager *)fm
 {
     return [NSFileManager defaultManager];
@@ -1361,51 +434,35 @@ static void NXRecoveryReleaseData(void *info, const void *data, size_t size)
     self.browserOnFile = onFile;
     
     NSMutableArray<NXRecoveryItem *> *items = [NSMutableArray array];
-    NSString *here = [path copy];
-    [items addObject:[NXRecoveryItem itemWithTitle:@"../" action:^(NXRecoveryViewController *c){
-        if(![here isEqualToString:c.browserRoot])
-        {
-            [c browsePath:[c fmParentOfPath:here]];
-        }
-        else if(c.browserOnBack != nil)
-        {
-            c.browserOnBack(c);
-        }
-        else
-        {
-            [c exitRecovery];
-        }
-    }]];
-    
     for(NXRecoveryEntry *e in dirs)
     {
-        NSString *full = e.path;
-        [items addObject:[NXRecoveryItem itemWithTitle:e.displayTitle action:^(NXRecoveryViewController *c) {
-            [c browsePath:full];
-        }]];
+        NSString *full=e.path;
+        NXRecoveryItem *item=[NXRecoveryItem itemWithTitle:e.displayTitle action:^(NXRecoveryViewController *c){[c browsePath:full];}];
+        item.filePath=full;[items addObject:item];
     }
-    
     for(NXRecoveryEntry *e in files)
     {
-        NSString *full = e.path;
-        NSString *name = e.name;
-        BOOL broken = e.isBroken;
-        
-        [items addObject:[NXRecoveryItem itemWithTitle:e.displayTitle action:^(NXRecoveryViewController *c) {
-            if(broken)
-            {
-                [c recoveryLogError:[@"dangling symlink: " stringByAppendingString:name]];
-                return;
-            }
-            if(c.browserOnFile != nil)
-            {
-                c.browserOnFile(full, name, c);
-            }
+        NSString *full=e.path, *name=e.name;BOOL broken=e.isBroken;
+        NXRecoveryItem *item=[NXRecoveryItem itemWithTitle:e.displayTitle action:^(NXRecoveryViewController *c){
+            if(broken){[c recoveryLogError:[@"dangling symlink: " stringByAppendingString:name]];return;}
+            if(c.fmActive){if(!c.fmPickingDestination)[c fmShowOptionsForPath:full folder:NO];return;}
+            if(c.browserOnFile)c.browserOnFile(full,name,c);
+        }];
+        item.filePath=full;[items addObject:item];
+    }
+    /* TWRP's select-folder button: Choose Action on the folder shown, or the destination of a copy/move */
+    if(self.fmActive)
+    {
+        [items addObject:[NXRecoveryItem itemWithTitle:@"Select Folder" action:^(NXRecoveryViewController *c){
+            NSString *folder=c.browserPath;if(!folder)return;
+            if(c.fmPickingDestination)[c fmConfirmDestination:folder];
+            else [c fmShowOptionsForPath:folder folder:YES];
         }]];
     }
-    
+    self.fmInputPage = NO;
     [self setRecoveryHeader:[NSString stringWithFormat:@"%@\n%@", (header ?: @"Files"), path]];
     [self setRecoveryItems:items];
+    if(items.count)self.recoveryIndex=[self.surface browserIndexAfterMoving:0 current:-1];
 }
 
 - (void)enterFileBrowserAtPath:(NSString *)path
@@ -1418,62 +475,298 @@ static void NXRecoveryReleaseData(void *info, const void *data, size_t size)
     [self browsePath:path root:root header:header onBack:onBack onFile:onFile];
 }
 
-- (void)enterConsole
+
+
+/* ----------------------------------------------------------------------
+ *  TWRP file manager: filemanagerlist, filemanageroptions,
+ *  choosedestinationfolder, filemanagerrenamefile/folder, filemanagerchmod,
+ *  filemanagerconfirm and filemanageraction
+ * -------------------------------------------------------------------- */
+
+static NSString *const NXRecoveryFMDestinationHeader = @"Select Destination Folder";
+
+- (void)enterFileManagerAtPath:(NSString *)path
+                          root:(NSString *)root
+                        onBack:(NXRecoveryAction)onBack
+{
+    [self enterRecoveryWithHeader:@"File Manager" instructions:nil footer:nil items:@[] onSelect:nil onMove:nil];
+    self.fmActive = YES;
+    self.fmRoot = root ?: @"/";
+    self.fmOnBack = onBack;
+    self.fmListPath = path;
+    [self browsePath:path root:self.fmRoot header:@"File Manager" onBack:onBack onFile:nil];
+}
+
+- (BOOL)fmPickingDestination
+{
+    return self.fmActive && self.browserPath != nil && [self.browserHeader isEqualToString:NXRecoveryFMDestinationHeader];
+}
+
+/* the folder the list was showing; what it showed may be gone after a move, rename or delete */
+- (void)fmShowList
+{
+    NSString *path = self.fmListPath ?: self.fmRoot;
+    while(![self.fm fileExistsAtPath:path] && ![path isEqualToString:self.fmRoot] && path.length > 1)
+    {
+        path = [self fmParentOfPath:path];
+    }
+    self.fmActive = YES;
+    [self browsePath:path root:self.fmRoot header:@"File Manager" onBack:self.fmOnBack onFile:nil];
+}
+
+- (void)fmShowPage:(NSString *)header instructions:(NSString *)instructions items:(NSArray<NXRecoveryItem *> *)items input:(BOOL)input
+{
+    self.browserPath = nil;
+    self.fmInputPage = input;
+    self.headerText = header;
+    self.instructionsText = instructions ?: @"";
+    [self.mutableItems setArray:items];
+    self.onSelect = nil;
+    self.onMove = nil;
+    _recoveryIndex = 0;
+    for(NSUInteger i = 0; i < items.count; i++)
+    {
+        if(items[i].enabled) { _recoveryIndex = i; break; }
+    }
+    [self renderPage];
+}
+
+- (NXRecoveryItem *)fmItem:(NSString *)title enabled:(BOOL)enabled action:(NXRecoveryAction)action
+{
+    NXRecoveryItem *item = [NXRecoveryItem itemWithTitle:title action:action];
+    item.enabled = enabled;
+    return item;
+}
+
+- (void)fmShowOptionsForPath:(NSString *)path folder:(BOOL)folder
+{
+    if(self.browserPath)
+    {
+        self.fmListPath = self.browserPath;
+    }
+    self.fmTarget = path;
+    self.fmTargetIsFolder = folder;
+    [self fmShowOptions];
+}
+
+/* filemanageroptions */
+- (void)fmShowOptions
+{
+    NSString *path = self.fmTarget;
+    BOOL folder = self.fmTargetIsFolder;
+    BOOL visible = [NXRecoveryTerminal.shared shellPathForPath:path] != nil;
+    NSArray<NXRecoveryItem *> *items = @[
+        folder ?
+            [self fmItem:@"Open Terminal Here" enabled:visible action:^(NXRecoveryViewController *c){ [NXRecoveryTerminal.shared openTerminalAt:path inRecovery:c]; }] :
+            [self fmItem:@"Edit File" enabled:visible action:^(NXRecoveryViewController *c){ [NXRecoveryTerminal.shared editFile:path inRecovery:c]; }],
+        [self fmItem:folder ? @"Copy Folder" : @"Copy File" enabled:YES action:^(NXRecoveryViewController *c){ [c fmChooseDestination:NXRecoveryFileCopy]; }],
+        [self fmItem:@"Move" enabled:YES action:^(NXRecoveryViewController *c){ [c fmChooseDestination:NXRecoveryFileMove]; }],
+        [self fmItem:@"chmod 755" enabled:YES action:^(NXRecoveryViewController *c){ [c fmConfirm:NXRecoveryFileChmod argument:@"755"]; }],
+        [self fmItem:@"chmod" enabled:YES action:^(NXRecoveryViewController *c){ [c fmAskPermissions]; }],
+        [self fmItem:@"Delete" enabled:YES action:^(NXRecoveryViewController *c){ [c fmConfirm:NXRecoveryFileDelete argument:nil]; }],
+        [self fmItem:folder ? @"Rename Folder" : @"Rename File" enabled:YES action:^(NXRecoveryViewController *c){ [c fmAskName]; }],
+    ];
+    [self fmShowPage:@"File Manager\nChoose Action" instructions:path items:items input:NO];
+}
+
+/* choosedestinationfolder: the list, folders only; its select-folder button picks the one shown */
+- (void)fmChooseDestination:(NXRecoveryFileOperation)operation
+{
+    self.fmPending = operation;
+    NSString *start = self.fmListPath ?: self.fmRoot;
+    [self browsePath:start root:self.fmRoot header:NXRecoveryFMDestinationHeader onBack:^(NXRecoveryViewController *c){ [c fmShowOptions]; } onFile:nil];
+}
+
+- (void)fmConfirmDestination:(NSString *)folder
+{
+    [self fmConfirm:(NXRecoveryFileOperation)self.fmPending argument:folder];
+}
+
+- (void)enterBootArgumentsInput:(NSString *)text help:(NSString *)help onSave:(void (^)(NXRecoveryViewController *controller, NSString *text))onSave
 {
     [self createRecoveryView];
-    if(self.consoleActive)
-    {
-        return;
-    }
-    
-    self.consoleActive = YES;
-    self.consoleSelectAction = nil;
-    
-    self.savedLogMax = self.recoveryLogMax;
-    _recoveryLogMax = 1024;
-    
-    self.headerView.hidden = YES;
-    self.instructionsView.hidden = YES;
-    self.menuStack.hidden = YES;
-    self.view.userInteractionEnabled = NO;
-    
-    self.menuFooterConstraint.active = NO;
-    self.consoleTopConstraint.active = YES;
-    [self.view setNeedsLayout];
-    [self.view layoutIfNeeded];
-    
-    [self trimRecoveryLog];
-    [self paintRecoveryLog];
+    if(self.terminalActive) [self exitTerminal];
+    [self.pages addObject:[self snapshot]];
+    [self.surface prepareTextInput:text ?: @""];
+    void (^back)(NXRecoveryViewController *) = ^(NXRecoveryViewController *c){
+        NXRecoveryPage *page = c.pages.lastObject;
+        if(page == nil) return;
+        [c.pages removeLastObject];
+        [c restorePage:page];
+    };
+    void (^save)(NXRecoveryViewController *, NSString *) = [onSave copy];
+    NSArray<NXRecoveryItem *> *items = @[
+        [self fmItem:@"Cancel" enabled:YES action:back],
+        [self fmItem:@"Save" enabled:YES action:^(NXRecoveryViewController *c){
+            NSString *value = [c.surface textInputValue] ?: @"";
+            back(c);
+            if(save) save(c, value);
+        }],
+    ];
+    /* "Settings\nBoot Arguments" is what NXTWRPIsBootArgumentsInput keys the page on */
+    [self fmShowPage:@"Settings\nBoot Arguments" instructions:help items:items input:YES];
 }
 
-- (void)finishConsoleWithSelectAction:(NXRecoveryAction)action
+/* filemanagerrenamefile / filemanagerrenamefolder */
+- (void)fmAskName
 {
-    if(!self.consoleActive)
-    {
-        return;
-    }
-    self.consoleSelectAction = action;
+    [self.surface prepareTextInput:self.fmTarget.lastPathComponent];
+    NSArray<NXRecoveryItem *> *items = @[
+        [self fmItem:@"Cancel" enabled:YES action:^(NXRecoveryViewController *c){ [c fmShowOptions]; }],
+        [self fmItem:@"Rename" enabled:YES action:^(NXRecoveryViewController *c){
+            NSString *name = [c.surface textInputValue];
+            if(name.length == 0 || name.length > 128 || [name containsString:@"/"] || [name isEqualToString:@"."] || [name isEqualToString:@".."])
+            {
+                [c recoveryLogError:[@"invalid name: " stringByAppendingString:name]];
+                return;
+            }
+            [c fmConfirm:NXRecoveryFileRename argument:name];
+        }],
+    ];
+    [self fmShowPage:self.fmTargetIsFolder ? @"File Manager\nRename Folder" : @"File Manager\nRename File" instructions:self.fmTarget items:items input:YES];
 }
 
-- (void)exitConsole
+/* filemanagerchmod */
+- (void)fmAskPermissions
 {
-    if(!self.consoleActive)
+    struct stat st;
+    NSString *mode = lstat(self.fmTarget.fileSystemRepresentation, &st) == 0 ? [NSString stringWithFormat:@"%04o", st.st_mode & 07777] : @"0000";
+    [self.surface prepareTextInput:mode];
+    NSArray<NXRecoveryItem *> *items = @[
+        [self fmItem:@"Cancel" enabled:YES action:^(NXRecoveryViewController *c){ [c fmShowOptions]; }],
+        [self fmItem:@"Set Permissions" enabled:YES action:^(NXRecoveryViewController *c){
+            NSString *value = [c.surface textInputValue];
+            NSCharacterSet *octal = [NSCharacterSet characterSetWithCharactersInString:@"01234567"];
+            if(value.length < 3 || value.length > 4 || [value rangeOfCharacterFromSet:octal.invertedSet].location != NSNotFound)
+            {
+                [c recoveryLogError:[@"invalid permissions: " stringByAppendingString:value]];
+                return;
+            }
+            [c fmConfirm:NXRecoveryFileChmod argument:value];
+        }],
+    ];
+    [self fmShowPage:@"File Manager\nSet Permissions" instructions:self.fmTarget items:items input:YES];
+}
+
+- (NSString *)fmTypeName
+{
+    return self.fmTargetIsFolder ? @"Folder" : @"File";
+}
+
+/* filemanagerconfirm: tw_fm_text1, tw_filename1, tw_fm_text2, tw_fm_text3 (and tw_fm_type) */
+- (void)fmConfirm:(NXRecoveryFileOperation)operation argument:(NSString *)argument
+{
+    NSString *target = self.fmTarget;
+    NSString *text1 = @"", *text2 = @"", *text3 = @"";
+    switch(operation)
     {
-        return;
+        case NXRecoveryFileCopy:   text1 = @"Copying"; text2 = @"to"; text3 = argument; break;
+        case NXRecoveryFileMove:   text1 = @"Moving"; text2 = @"to"; text3 = argument; break;
+        case NXRecoveryFileChmod:  text1 = [@"chmod " stringByAppendingString:argument]; break;
+        case NXRecoveryFileDelete: text1 = @"Deleting"; break;
+        case NXRecoveryFileRename: text1 = @"Renaming"; text2 = @"to"; text3 = [[target stringByDeletingLastPathComponent] stringByAppendingPathComponent:argument]; break;
     }
-    
-    self.consoleActive = NO;
-    self.consoleSelectAction = nil;
-    
-    self.consoleTopConstraint.active = NO;
-    self.menuFooterConstraint.active = YES;
-    
-    self.headerView.hidden = NO;
-    self.instructionsView.hidden = NO;
-    self.menuStack.hidden = NO;
-    self.view.userInteractionEnabled = YES;
-    
-    self.recoveryLogMax = self.savedLogMax;
+    NSString *details = [@[text1, target, text2, text3, self.fmTypeName] componentsJoinedByString:@"\n"];
+    NSArray<NXRecoveryItem *> *items = @[
+        [self fmItem:@"Cancel" enabled:YES action:^(NXRecoveryViewController *c){ [c fmShowOptions]; }],
+        [self fmItem:@"Confirm" enabled:YES action:^(NXRecoveryViewController *c){ [c fmRun:operation argument:argument]; }],
+    ];
+    [self fmShowPage:@"File Manager\nConfirm Action" instructions:details items:items input:NO];
+}
+
+/* filemanageraction: runs it, then back to the list (errors stay on screen until Continue) */
+- (void)fmRun:(NXRecoveryFileOperation)operation argument:(NSString *)argument
+{
+    NSString *target = self.fmTarget;
+    BOOL targetIsFolder = self.fmTargetIsFolder;
+    NSString *destination = nil;
+    NSString *status = nil;
+    switch(operation)
+    {
+        case NXRecoveryFileCopy:
+        case NXRecoveryFileMove:
+            destination = [argument stringByAppendingPathComponent:target.lastPathComponent];
+            status = [NSString stringWithFormat:@"%@ %@ to %@", operation == NXRecoveryFileCopy ? @"Copying" : @"Moving", target, argument];
+            break;
+        case NXRecoveryFileRename:
+            destination = [target.stringByDeletingLastPathComponent stringByAppendingPathComponent:argument];
+            status = [NSString stringWithFormat:@"Renaming %@ to %@", target, destination];
+            break;
+        case NXRecoveryFileChmod:
+            status = [NSString stringWithFormat:@"chmod %@ %@", argument, target];
+            break;
+        case NXRecoveryFileDelete:
+            status = [@"Deleting " stringByAppendingString:target];
+            break;
+    }
+
+    [self enterConsole];
+    [self recoveryLog:status];
+    __weak NXRecoveryViewController *weakSelf = self;
+    dispatch_async(dispatch_get_global_queue(QOS_CLASS_USER_INITIATED, 0), ^{
+        NSFileManager *fm = [NSFileManager new];
+        NSError *error = nil;
+        BOOL ok = YES;
+        switch(operation)
+        {
+            case NXRecoveryFileCopy:
+            case NXRecoveryFileMove:
+            case NXRecoveryFileRename:
+            {
+                BOOL folder = NO;
+                if([destination isEqualToString:target] ||
+                   (targetIsFolder && [destination hasPrefix:[target stringByAppendingString:@"/"]]))
+                {
+                    error = [NSError errorWithDomain:NSPOSIXErrorDomain code:EINVAL userInfo:@{NSLocalizedDescriptionKey: @"the destination is the source itself"}];
+                    ok = NO;
+                    break;
+                }
+                /* like cp/mv, a file replaces a file of the same name; folders never replace anything */
+                if([fm fileExistsAtPath:destination isDirectory:&folder])
+                {
+                    if(folder || targetIsFolder)
+                    {
+                        error = [NSError errorWithDomain:NSPOSIXErrorDomain code:EEXIST userInfo:@{NSLocalizedDescriptionKey: [destination stringByAppendingString:@" already exists"]}];
+                        ok = NO;
+                        break;
+                    }
+                    ok = [fm removeItemAtPath:destination error:&error];
+                }
+                if(ok)
+                {
+                    ok = operation == NXRecoveryFileCopy ? [fm copyItemAtPath:target toPath:destination error:&error]
+                                                         : [fm moveItemAtPath:target toPath:destination error:&error];
+                }
+                break;
+            }
+            case NXRecoveryFileChmod:
+                if(chmod(target.fileSystemRepresentation, (mode_t)strtol(argument.UTF8String, NULL, 8)) != 0)
+                {
+                    error = [NSError errorWithDomain:NSPOSIXErrorDomain code:errno userInfo:@{NSLocalizedDescriptionKey: @(strerror(errno))}];
+                    ok = NO;
+                }
+                break;
+            case NXRecoveryFileDelete:
+                ok = [fm removeItemAtPath:target error:&error];
+                break;
+        }
+        dispatch_async(dispatch_get_main_queue(), ^{
+            NXRecoveryViewController *c = weakSelf;
+            if(c == nil)
+            {
+                return;
+            }
+            if(ok)
+            {
+                [c recoveryLog:@"Done."];
+                [c exitConsole];
+                [c fmShowList];
+                return;
+            }
+            [c recoveryLogError:[@"ERROR: " stringByAppendingString:error.localizedDescription ?: @"the operation failed"]];
+            [c finishConsoleWithSelectAction:^(NXRecoveryViewController *done) { [done exitConsole]; [done fmShowList]; }];
+        });
+    });
 }
 
 @end

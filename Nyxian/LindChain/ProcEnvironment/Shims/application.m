@@ -28,7 +28,7 @@
 #import <LindChain/Utils/Swizzle.h>
 #import <LindChain/ProcEnvironment/Shims/proxy.h>
 #import <LindChain/ProcEnvironment/Surface/sys/syscall.h>
-#import <LiveShim/LiveShimSyscall.h>
+#import <LiveProcessLegacy/LPLSyscall.h>
 #include <ksurface_config.h>
 #include <ksurface_abi.h>
 

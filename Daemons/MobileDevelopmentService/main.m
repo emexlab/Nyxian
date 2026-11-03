@@ -22,9 +22,9 @@
 
 #import <Foundation/Foundation.h>
 #import <MobileDevelopmentKit/MobileDevelopmentKit.h>
-#import <LiveShim/Service.h>
-#import <LiveShim/ServiceProtocol.h>
-#import <LiveShim/vroot.h>
+#import <LiveProcessLegacy/LPLService.h>
+#import <LiveProcessLegacy/LPLServiceProtocol.h>
+#import <LiveProcessLegacy/LPLVRoot.h>
 
 static NSString *ubid = nil;
 static MDKDependencyScanner *dependencyScanner = nil;

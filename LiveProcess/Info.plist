@@ -64,5 +64,16 @@
 		<key>_ProcessType</key>
 		<string>App</string>
 	</dict>
+	<key>NXLiveProcessBootstrapVersion</key>
+	<integer>1</integer>
+	<key>NXLiveProcessBrokerVersion</key>
+	<integer>1</integer>
+	<key>NXLiveProcessABI</key>
+	<integer>1</integer>
+	<key>NXLiveProcessExecutionPaths</key>
+	<array>
+		<string>legacy</string>
+		<string>libsystem-v1</string>
+	</array>
 </dict>
 </plist>

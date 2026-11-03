@@ -30,17 +30,6 @@ typedef NS_ENUM(NSInteger, NXRecoveryLogLevel) {
     NXRecoveryLogLevelError = 1,
 };
 
-typedef NS_ENUM(NSInteger, NXRecoveryButton) {
-    NXRecoveryButtonNone = 0,
-    NXRecoveryButtonVolumeUp = 1,
-    NXRecoveryButtonVolumeDown = 2,
-};
-
-typedef NS_ENUM(NSInteger, NXRecoveryEventKind) {
-    NXRecoveryEventKindTap = 0,
-    NXRecoveryEventKindSelect = 1,
-};
-
 @class NXRecoveryViewController;
 @class NXRecoveryItem;
 
@@ -53,6 +42,12 @@ extern const CGFloat NXRecoveryFontSize;
 @interface NXRecoveryItem : NSObject
 
 @property (nonatomic, copy) NSString *title;
+@property (nonatomic) BOOL enabled;
+@property (nonatomic) BOOL toggle;
+@property (nonatomic) BOOL checked;
+/* a toggle that is one choice of a radio group (drawn with TWRP's radio buttons) */
+@property (nonatomic) BOOL radio;
+@property (nonatomic, copy, nullable) NSString *filePath;
 @property (nonatomic, copy) NXRecoveryAction action;
 
 - (instancetype)initWithTitle:(NSString *)title action:(NXRecoveryAction)action;
@@ -70,6 +65,7 @@ extern const CGFloat NXRecoveryFontSize;
 @property (nonatomic, readonly, getter=isRecoveryActive) BOOL recoveryActive;
 @property (nonatomic) NSInteger recoveryLogMax;
 @property (nonatomic, readonly, getter=isConsoleActive) BOOL consoleActive;
+@property (nonatomic, readonly, getter=isTerminalActive) BOOL terminalActive;
 
 + (UIColor *)recoveryBackgroundColor;
 + (UIColor *)recoveryHeaderColor;
@@ -94,8 +90,6 @@ extern const CGFloat NXRecoveryFontSize;
 - (void)enterRecoveryWithHeader:(NSString *)header instructions:(NSString *)instructions footer:(NSString *)footer items:(NSArray<NXRecoveryItem *> *)items onSelect:(NXRecoveryIndexHandler)onSelect onMove:(NXRecoveryIndexHandler)onMove;
 - (void)exitRecovery;
 
-- (void)handleButton:(NXRecoveryButton)button kind:(NXRecoveryEventKind)kind;
-- (void)handleButton:(NSInteger)button kindString:(NSString *)kind;
 
 - (void)recoveryLog:(NSString *)line;
 - (void)recoveryLog:(NSString *)line level:(NXRecoveryLogLevel)level;
@@ -105,10 +99,30 @@ extern const CGFloat NXRecoveryFontSize;
 - (void)browsePath:(NSString *)path root:(NSString *)root header:(NSString *)header onBack:(NXRecoveryAction)onBack onFile:(NXRecoveryFileHandler)onFile;
 - (void)browsePath:(NSString *)path;
 - (void)enterFileBrowserAtPath:(NSString *)path root:(NSString *)root header:(NSString *)header onBack:(NXRecoveryAction)onBack onFile:(NXRecoveryFileHandler)onFile;
+/* TWRP's file manager: a file or the select-folder button opens "Choose Action" (Edit File in the terminal, Open Terminal Here, Copy, Move, chmod, Delete, Rename) */
+- (void)enterFileManagerAtPath:(NSString *)path root:(NSString *)root onBack:(NXRecoveryAction)onBack;
 
+/* Settings > General > Boot Arguments: a TWRP text input page with the keyboard. Cancel / Back return to the page it
+   was opened from; Save does too and then hands over what was typed */
+- (void)enterBootArgumentsInput:(NSString *)text help:(NSString *)help onSave:(void (^)(NXRecoveryViewController *controller, NSString *text))onSave;
+
+- (void)importRecoveryTheme;
+- (void)useStockRecoveryTheme;
+- (void)reloadRecoveryTheme;
+- (void)restoreRecoverySettings;
+- (void)focusWipeConfirmation;
+
+- (void)setOperationProgress:(double)fraction status:(NSString *)status;
+- (void)clearOperationProgress;
 - (void)enterConsole;
 - (void)finishConsoleWithSelectAction:(nullable NXRecoveryAction)action;
+/* the same with another button and subtitle than "Continue"/"Complete" (a failed locked-down boot: "Reboot") */
+- (void)finishConsoleWithSelectAction:(nullable NXRecoveryAction)action title:(NSString *)title status:(NSString *)status;
 - (void)exitConsole;
+
+/* the TWRP terminal (NXRecoveryTerminal starts its session), shown over the current page; Back/Home leave it */
+- (void)enterTerminal;
+- (void)exitTerminal;
 
 @end
 

@@ -20,13 +20,6 @@
  See LICENSE for the full license terms.
 */
 
-/*
- * Host side of the task port handoff (KSurface libkern/task_handoff.c):
- * the guest moves the receive right of an EXC_BREAKPOINT exception port to
- * us, executes brk #1, and the exception message carries its task port.
- * We step over the brk and keep the task port for copy-in/out.
- */
-
 #include "rks.h"
 #include <mach/exc.h>
 #include <mach/thread_status.h>
@@ -44,7 +37,7 @@ typedef struct {
 kern_return_t rks_task_handoff_receive(mach_port_t exception_port, task_t *task)
 {
     *task = MACH_PORT_NULL;
-
+    
     rks_exception_request_t request;
     memset(&request, 0, sizeof(request));
     request.v.Head.msgh_local_port = exception_port;
@@ -55,7 +48,7 @@ kern_return_t rks_task_handoff_receive(mach_port_t exception_port, task_t *task)
         rks_logf("handoff: no exception message (0x%x)", mr);
         return KERN_FAILURE;
     }
-
+    
     kern_return_t kr = KERN_FAILURE;
     if((request.v.Head.msgh_bits & MACH_MSGH_BITS_COMPLEX) == 0 ||
        request.v.msgh_body.msgh_descriptor_count != 2 ||
@@ -65,7 +58,7 @@ kern_return_t rks_task_handoff_receive(mach_port_t exception_port, task_t *task)
         rks_logf("handoff: malformed exception message");
         goto reply;
     }
-
+    
     /* step over the brk #1 so the guest continues behind it */
     arm_thread_state64_t state;
     mach_msg_type_number_t count = ARM_THREAD_STATE64_COUNT;
@@ -81,13 +74,13 @@ kern_return_t rks_task_handoff_receive(mach_port_t exception_port, task_t *task)
     {
         goto reply;
     }
-
+    
     kr = mach_port_mod_refs(mach_task_self(), request.v.task.name, MACH_PORT_RIGHT_SEND, 1);
     if(kr == KERN_SUCCESS)
     {
         *task = request.v.task.name;
     }
-
+    
 reply:
     {
         __Reply__exception_raise_t reply;
@@ -114,7 +107,7 @@ int64_t rks_sys_handoffep(rks_call_t *call)
     {
         RKS_FAIL(call, EINVAL);
     }
-
+    
     pthread_mutex_lock(&rks_proc_lock);
     if(call->proc->task != MACH_PORT_NULL)
     {
@@ -124,17 +117,17 @@ int64_t rks_sys_handoffep(rks_call_t *call)
     }
     call->proc->handoff_pending = true;
     pthread_mutex_unlock(&rks_proc_lock);
-
+    
     /* keep the receive right, reply first: the guest executes brk only after the syscall returned */
     mach_port_t exception_port = call->in_ports[0];
     call->in_ports[0] = MACH_PORT_NULL;
     rks_send_reply(call->buffer, 0, NULL, 0, 0);
     call->buffer = NULL;
-
+    
     task_t task = MACH_PORT_NULL;
     kern_return_t kr = rks_task_handoff_receive(exception_port, &task);
     mach_port_mod_refs(mach_task_self(), exception_port, MACH_PORT_RIGHT_RECEIVE, -1);
-
+    
     pid_t pid = -1;
     if(kr != KERN_SUCCESS || pid_for_task(task, &pid) != KERN_SUCCESS || pid != call->proc->pid)
     {
@@ -149,7 +142,7 @@ int64_t rks_sys_handoffep(rks_call_t *call)
         rks_proc_signal(call->proc, SIGKILL);
         return 0;
     }
-
+    
     rks_proc_set_task(call->proc, task);
     return 0;
 }

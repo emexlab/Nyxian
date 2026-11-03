@@ -45,9 +45,9 @@ class CreditsViewController: NXUITableViewController {
                     ghuser: "mach-port-t"
                 ),
                 Credit(
-                    name: "Catelyn",
+                    name: "RoothideDev",
                     role: "Developer",
-                    ghuser: "mimalloc"
+                    ghuser: "roothider"
                 ),
                 Credit(
                     name: "LucaVmu",

@@ -21,7 +21,7 @@
 */
 
 #import <Foundation/Foundation.h>
-#import <LiveShim/Service.h>
+#import <LiveProcessLegacy/LPLService.h>
 
 int main(int argc, char **argv)
 {

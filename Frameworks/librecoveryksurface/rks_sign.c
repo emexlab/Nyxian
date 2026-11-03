@@ -20,18 +20,6 @@
  See LICENSE for the full license terms.
 */
 
-/*
- * Signing on demand. SYS_sign is the LiveShim one (a fileport of a file
- * opened O_RDWR, used by the guest runtime's dlopen and posix_spawn), SYS_sign2
- * is the procursus jailed one (a path, used by librecoveryrtpatch's dyld stat
- * hook for every dependency dyld loads).
- *
- * KSurface refuses to sign inside the ROM slot. The recovery has no ROM and
- * drops that kind of check, it only keeps the signer from touching anything
- * outside the bootloader's own container: the bundle is read only anyway and
- * there is nothing else a guest could reach.
- */
-
 #include "rks.h"
 #include <LindChain/Private/mach/fileport.h>
 #include <stdlib.h>

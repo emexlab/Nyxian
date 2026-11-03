@@ -79,7 +79,7 @@
 #import <LindChain/ProcEnvironment/Surface/libkern/klog.h>
 
 /* Daemon Interfaces Headers */
-#import <LindChain/Services/bootstrapd/LDEApplicationWorkspace.h>
+#import <Frameworks/LiveProcessLegacy/LindChain/Services/bootstrapd/LDEApplicationWorkspace.h>
 
 void refreshFile(const char* path);
 

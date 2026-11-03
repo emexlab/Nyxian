@@ -23,7 +23,7 @@
  SOFTWARE.
  */
 
-#include <LindChain/ProcEnvironment/litehook/litehook.h>
+#include "litehook.h"
 #include <stdarg.h>
 #include <stdbool.h>
 #include <stdlib.h>

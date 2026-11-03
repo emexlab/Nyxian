@@ -273,3 +273,20 @@ BOOL NXSignMachOAuto(NSURL *url)
             return NO;
     }
 }
+
+BOOL NXSignMachOWithIdentity(NSURL *url,
+                             NSData *profile,
+                             NSData *certificate,
+                             NSString *password)
+{
+    NXMachOKind kind=NXClassifyMachO(url.path.UTF8String);
+    if(kind != NXMachOExec && kind != NXMachOLib)
+    {
+        return NO;
+    }
+    if(kind == NXMachOExec && [LCUtils patchExecutable:url.path])
+    {
+        return NO;
+    }
+    return [ZSigner signMachOAtPath:url.path prov:profile key:certificate pass:password];
+}

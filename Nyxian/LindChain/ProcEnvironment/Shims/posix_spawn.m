@@ -28,7 +28,7 @@
 #import <LindChain/ProcEnvironment/litehook/litehook.h>
 #import <LindChain/ProcEnvironment/LiveContainer/LCUtils.h>
 #import <LindChain/ProcEnvironment/LiveContainer/ZSign/zsigner.h>
-#import <LiveShim/LiveShimSyscall.h>
+#import <LiveProcessLegacy/LPLSyscall.h>
 #import <Broadpatch/Broadpatch.h>
 #import <fcntl.h>
 #import <ksurface_config.h>

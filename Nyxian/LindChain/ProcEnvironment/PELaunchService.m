@@ -136,6 +136,16 @@
     [fileTable appendFileDescriptor:kfd withMappingToLoc:STDERR_FILENO];
 #endif /* KSURFACE_PROCESSLOGGING_REDIRECT_STD */
     mutable[@"PEFileTable"] = fileTable;
+#else
+    /* TEMP debug tap (revert via git when lsd is fixed): wire the guest's
+     * stdout/stderr to the host's own fds so guest [lp-module]/[lsd] output lands
+     * on the same console as the [ksurface:...] lines, even in RELEASE. */
+    {
+        PEFileTable *debugTapTable = [PEFileTable emptyTable];
+        [debugTapTable appendFileDescriptor:STDOUT_FILENO withMappingToLoc:STDOUT_FILENO];
+        [debugTapTable appendFileDescriptor:STDERR_FILENO withMappingToLoc:STDERR_FILENO];
+        mutable[@"PEFileTable"] = debugTapTable;
+    }
 #endif /* DEBUG && KSURFACE_KLOG_ENABLE_DAEMONS */
     items = [mutable copy];
     

@@ -34,12 +34,13 @@
 #import <LindChain/ProcEnvironment/LiveContainer/Tweaks/Tweaks.h>
 #import <LindChain/ProcEnvironment/LiveContainer/Tweaks/DyldHook.h>
 #import <LindChain/Utils/CFTools.h>
-#import <LiveShim/LiveShimSyscall.h>
-#import <LiveShim/patchcache.h>
-#import <LiveShim/dyld.h>
+#import <LiveProcessLegacy/LPLSyscall.h>
+#import <LiveProcessLegacy/LPLLSPatchcache.h>
+#import <LiveProcessLegacy/LPLLSDyld.h>
 #import <ksurface_config.h>
 #import <ksurface_abi.h>
 #import <Broadpatch/Broadpatch.h>
+#include <Frameworks/libpatchfind/libpatchfind.h>
 
 static const char *gHostImageNeedles[] = {
     "/Nyxian.app/PlugIns/LiveProcess.appex/LiveProcess",

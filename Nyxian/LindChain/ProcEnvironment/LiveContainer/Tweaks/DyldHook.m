@@ -26,7 +26,7 @@
 #include <assert.h>
 #include <LindChain/ProcEnvironment/LiveContainer/utils.h>
 #include <LindChain/ProcEnvironment/litehook/litehook.h>
-#include <LiveShim/patchcache.h>
+#include <LiveProcessLegacy/LPLLSPatchcache.h>
 #include <mach/mach.h>
 
 bool performHookDyldApi(const char* functionName,

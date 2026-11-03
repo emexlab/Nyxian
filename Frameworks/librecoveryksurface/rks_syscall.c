@@ -39,10 +39,6 @@ extern kern_return_t mach_vm_write(vm_map_t target_task, mach_vm_address_t addre
 
 #define RKS_WORKERS 8
 
-/* ----------------------------------------------------------------------
- *  guest memory
- * -------------------------------------------------------------------- */
-
 bool rks_copy_in(task_t task, void *dst, uint64_t src, size_t size)
 {
     if(task == MACH_PORT_NULL || src == 0 || dst == NULL)
@@ -393,10 +389,6 @@ int rks_syscall_server_start(void)
     return 0;
 }
 
-/* ----------------------------------------------------------------------
- *  small handlers
- * -------------------------------------------------------------------- */
-
 int64_t rks_sys_root_id(rks_call_t *call)
 {
     (void)call;
@@ -476,11 +468,6 @@ int64_t rks_sys_groupctl(rks_call_t *call)
     }
 }
 
-/*
- * No entitlements in recovery: dropping them always works, everything that
- * would need a ROM service (launch services, UI, kexts) does not exist here.
- * GetCDHash failing makes LCBootstrapMain fall back to a plain dlopen.
- */
 int64_t rks_sys_pectl(rks_call_t *call)
 {
     PECTLCategory category = (PECTLCategory)call->args[0];

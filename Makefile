@@ -138,6 +138,38 @@ package-app:
 	-rm $(FILE)
 	zip -r $(FILE) ./Payload
 
+# Recovery binpack (Shared/Recovery/binpack.zip, unpacked by the TWRP terminal), built from an emexOS
+# checkout: its procursus bootstrap and the vroot libraries of its last build (make there first)
+EMEXOS ?= ../emexOS
+# extra roothide procursus packages (nano, curl, wget, ...): drop their .debs into Recovery/binpack/debs
+recovery-binpack:
+	python3 Recovery/binpack/mkbinpack.py \
+		--bootstrap $(EMEXOS)/bootstrap \
+		--vroot-libs $(EMEXOS)/.rompkg/ROM/binpack/usr/lib \
+		$(if $(wildcard Recovery/binpack/debs/*.deb),--debs Recovery/binpack/debs) \
+		--output Shared/Recovery/binpack.zip
+
+.PHONY: recovery-binpack
+
+# TrustStore (TrustStore/README.md): the ROM release keys the bootloader trusts, signed offline.
+# truststore-root once, then edit TrustStore/truststore.json, raise its version and run truststore;
+# build/truststore/truststore.plist goes to https://emexlabs.org/switzach/truststore/truststore.plist
+TRUSTSTORE_KEY ?= $(HOME)/.config/nyxian/truststore/root.pem
+
+truststore-root:
+	python3 -I TrustStore/truststore.py genroot
+
+truststore:
+	python3 -I TrustStore/truststore.py build TrustStore/truststore.json -o build/truststore/truststore.plist --key "$(TRUSTSTORE_KEY)"
+	python3 -I TrustStore/truststore.py verify build/truststore/truststore.plist
+
+# the same store shipped inside the app, for a first boot without network
+truststore-bundle: truststore
+	mkdir -p Shared/TrustStore
+	cp build/truststore/truststore.plist Shared/TrustStore/truststore.plist
+
+.PHONY: truststore-root truststore truststore-bundle
+
 clean:
 	rm -rf Payload
 	rm -rf build

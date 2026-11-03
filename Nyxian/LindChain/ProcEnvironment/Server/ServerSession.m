@@ -22,7 +22,7 @@
 
 #import <mach/mach.h>
 #import <LindChain/ProcEnvironment/Server/ServerSession.h>
-#import <LindChain/Services/bootstrapd/LDEApplicationWorkspace.h>
+#import <Frameworks/LiveProcessLegacy/LindChain/Services/bootstrapd/LDEApplicationWorkspace.h>
 #import <LindChain/WindowServer/NXWindowServer.h>
 #import <LindChain/ProcEnvironment/LiveContainer/LCUtils.h>
 #import <LindChain/ProcEnvironment/Surface/trust/entitlement.h>

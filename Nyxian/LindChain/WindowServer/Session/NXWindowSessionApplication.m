@@ -25,7 +25,7 @@
 #import <LindChain/WindowServer/NXWindowServer.h>
 #import <LindChain/ProcEnvironment/PEExtension.h>
 #import <LindChain/Utils/Swizzle.h>
-#import <LindChain/Services/bootstrapd/LDEApplicationWorkspace.h>
+#import <Frameworks/LiveProcessLegacy/LindChain/Services/bootstrapd/LDEApplicationWorkspace.h>
 #import <LindChain/ProcEnvironment/Surface/libkern/klog.h>
 #import <objc/runtime.h>
 #import <os/lock.h>

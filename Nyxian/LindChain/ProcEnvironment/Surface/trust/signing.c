@@ -24,6 +24,7 @@
  *  Project Headers
  * -------------------------------------------------------------------- */
 #include <LindChain/ProcEnvironment/Surface/trust/signing.h>
+#include <LindChain/Utils/NXBootLockdown.h>
 #include <LindChain/ProcEnvironment/Surface/trust/cdhash.h>
 #include <LindChain/ProcEnvironment/Surface/trust/keychain.h>
 #include <LindChain/ProcEnvironment/Surface/surface.h>
@@ -255,10 +256,10 @@ kern_return_t trust_remove_blob_fd(int fd)
     return ftruncate(fd, (off_t)(size - total)) == 0 ? KERN_SUCCESS : KERN_FAILURE;
 }
 
-kern_return_t trust_nxt2_sign(const char *path,
-                              CFDictionaryRef entitlements,
-                              bool signBlob,
-                              const char *priv_der_path)
+NX_BOOT_ONLY kern_return_t trust_nxt2_sign(const char *path,
+                                           CFDictionaryRef entitlements,
+                                           bool signBlob,
+                                           const char *priv_der_path)
 {
     int fd = open(path, O_RDWR);
     if(fd < 0)
@@ -272,10 +273,10 @@ kern_return_t trust_nxt2_sign(const char *path,
     return kr;
 }
 
-kern_return_t trust_nxt2_sign_fd(int fd,
-                                 CFDictionaryRef entitlements,
-                                 bool signBlob,
-                                 const char *priv_der_path)
+NX_BOOT_ONLY kern_return_t trust_nxt2_sign_fd(int fd,
+                                              CFDictionaryRef entitlements,
+                                              bool signBlob,
+                                              const char *priv_der_path)
 {
     LCMachO *machO = LCMapMachOFromFDRO(dup(fd));
     if(machO == NULL)

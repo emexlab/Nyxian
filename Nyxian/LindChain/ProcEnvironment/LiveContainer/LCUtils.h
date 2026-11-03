@@ -48,3 +48,5 @@ __attribute__((objc_runtime_name("NXBootLCUtils")))
 BOOL NXSignMachOAuto(NSURL *url);
 
 #endif /* LIVECONTAINER_LCUTILS_H */
+
+BOOL NXSignMachOWithIdentity(NSURL *url, NSData *profile, NSData *certificate, NSString *password);

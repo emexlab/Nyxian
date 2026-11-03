@@ -30,7 +30,7 @@
 #import <LindChain/ProcEnvironment/PEFileTable.h>
 #import <LindChain/ProcEnvironment/PEProcessObserver.h>
 #import <LindChain/ProcEnvironment/Surface/proc/proc.h>
-#import <LindChain/Services/bootstrapd/LDEApplicationWorkspace.h>
+#import <Frameworks/LiveProcessLegacy/LindChain/Services/bootstrapd/LDEApplicationWorkspace.h>
 
 @interface PEProcess : NSObject <FBProcessObserver>
 

@@ -29,7 +29,9 @@
 #include <dispatch/dispatch.h>
 #include "libpatchfind.h"
 #include "litehook.h"
+
 #define NXPF_LOG(format, ...) NSLog(@"libpatchfind: " format, ##__VA_ARGS__)
+
 uint64_t aarch64_emulate_adrp_ldr(uint32_t instruction,
                                   uint32_t ldrInstruction,
                                   uint64_t pc)
@@ -48,6 +50,7 @@ uint64_t aarch64_emulate_adrp_ldr(uint32_t instruction,
     
     return page ? page + ((uint64_t)((ldrInstruction >> 10) & 0xFFFu) << 3) : 0;
 }
+
 static inline bool a64_is_bl(uint32_t insn)
 {
     return (insn & 0xFC000000u) == 0x94000000u;
@@ -137,43 +140,43 @@ static int cf_scan_for_slot(const uint32_t *fn,
 {
     uint32_t  adrpInsn[32] = {0};
     uintptr_t adrpPc[32]   = {0};
-
+    
     for(size_t i = 0; i < n; i++)
     {
         uint32_t  insn = fn[i];
         uintptr_t pc   = (uintptr_t)&fn[i];
-
+        
         if((insn & 0x9F000000u) == 0x90000000u)
         {
             adrpInsn[insn & 31] = insn;
             adrpPc[insn & 31]   = pc;
             continue;
         }
-
+        
         uint32_t rn = (insn >> 5) & 31;
         if(adrpPc[rn] == 0)
         {
             continue;
         }
-
+        
         uintptr_t slot;
         if(!find_global_slot(adrpPc[rn], adrpInsn[rn], insn, &slot))
         {
             continue;
         }
-
+        
         /* must live in CoreFoundation's image before we dereference it */
         Dl_info info;
         if(dladdr((const void *)slot, &info) == 0 || info.dli_fbase != cfBase)
         {
             continue;
         }
-
+        
         if(*(void * volatile *)slot != expected)
         {
             continue;
         }
-
+        
         if(*ioSlot != 0 && *ioSlot != slot)
         {
             return -1;
@@ -221,32 +224,32 @@ static int cf_scan_for_inited_flag(const uint32_t *fn,
                                    uintptr_t mainBundleSlot,
                                    uintptr_t *ioFlag)
 {
-    uint32_t  adrpInsn[32] = {0};
-    uintptr_t adrpPc[32]   = {0};
-
+    uint32_t adrpInsn[32] = {0};
+    uintptr_t adrpPc[32] = {0};
+    
     for(size_t i = 0; i < n; i++)
     {
-        uint32_t  insn = fn[i];
-        uintptr_t pc   = (uintptr_t)&fn[i];
-
+        uint32_t insn = fn[i];
+        uintptr_t pc = (uintptr_t)&fn[i];
+        
         if((insn & 0x9F000000u) == 0x90000000u)
         {
             adrpInsn[insn & 31] = insn;
             adrpPc[insn & 31]   = pc;
             continue;
         }
-
+        
         if(!a64_is_ldrb_uimm(insn))
         {
             continue;
         }
-
+        
         uint32_t rn = (insn >> 5) & 31;
         if(adrpPc[rn] == 0)
         {
             continue;
         }
-
+        
         /* LDRB imm12 is unscaled */
         uintptr_t flag = emulate_adrp(adrpPc[rn], adrpInsn[rn]) + ((insn >> 10) & 0xFFF);
 
@@ -255,30 +258,30 @@ static int cf_scan_for_inited_flag(const uint32_t *fn,
         {
             continue;
         }
-
+        
         Dl_info info;
         if(dladdr((const void *)flag, &info) == 0 || info.dli_fbase != cfBase)
         {
             continue;
         }
-
+        
         if(*(volatile uint8_t *)flag != 1)
         {
             continue;
         }
-
+        
         if(!a64_reg_tested_soon(&fn[i], insn & 31, 4))
         {
             continue;
         }
-
+        
         if(*ioFlag != 0 && *ioFlag != flag)
         {
             return -1;
         }
         *ioFlag = flag;
     }
-
+    
     return *ioFlag != 0;
 }
 
@@ -287,26 +290,26 @@ static bool cf_find_main_bundle_offs(uint64_t *outMainOff,
 {
     *outMainOff = 0;
     *outInitedOff = 0;
-
+    
     CFBundleRef mainBundle = CFBundleGetMainBundle();   /* forces init */
     if(mainBundle == NULL)
     {
         NXPF_LOG("CFBundleGetMainBundle returned NULL");
         return false;
     }
-
+    
     const uint32_t *fn = (const uint32_t *)dlsym(RTLD_DEFAULT, "CFBundleGetMainBundle");
     Dl_info cfInfo;
     if(fn == NULL || dladdr(fn, &cfInfo) == 0)
     {
         return false;
     }
-
+    
     const uint32_t *hitFn = fn;
     size_t hitLen = CF_SCAN_INSNS;
     uintptr_t slot = 0;
     int r = cf_scan_for_slot(fn, CF_SCAN_INSNS, cfInfo.dli_fbase, mainBundle, &slot);
-
+    
     if(r == 0)
     {
         size_t followed = 0;
@@ -327,13 +330,13 @@ static bool cf_find_main_bundle_offs(uint64_t *outMainOff,
             }
         }
     }
-
+    
     if(r != 1)
     {
         NXPF_LOG("_mainBundle slot %s", r < 0 ? "ambiguous" : "not found");
         return false;
     }
-
+    
     uintptr_t flag = 0;
     int rf = cf_scan_for_inited_flag(hitFn, hitLen, cfInfo.dli_fbase, slot, &flag);
     if(rf != 1)
@@ -341,8 +344,8 @@ static bool cf_find_main_bundle_offs(uint64_t *outMainOff,
         NXPF_LOG("_initedMainBundle %s", rf < 0 ? "ambiguous" : "not found");
         return false;
     }
-
-    *outMainOff   = (uint64_t)(slot - (uintptr_t)cfInfo.dli_fbase);
+    
+    *outMainOff = (uint64_t)(slot - (uintptr_t)cfInfo.dli_fbase);
     *outInitedOff = (uint64_t)(flag - (uintptr_t)cfInfo.dli_fbase);
     return true;
 }
@@ -374,17 +377,17 @@ static uint64_t ns_find_main_bundle_slot_off(void)
         {
             continue;
         }
-
+        
         /* iOS 17: adrp+add yields _MergedGlobals+4, accessed via ldur (0xF8xxxxxx) */
         if((impl[i+4] & 0xFF000000u) == 0xF8000000u)
         {
             mg = (void **)((uintptr_t)mg - 4);
         }
-
+        
         for(int j = 0; j < 24; j++)
         {
             uintptr_t slot = (uintptr_t)&mg[j];
-
+            
             /* must be inside Foundation before we trust/deref it */
             Dl_info sInfo;
             if(dladdr((const void *)slot, &sInfo) == 0 ||
@@ -392,12 +395,12 @@ static uint64_t ns_find_main_bundle_slot_off(void)
             {
                 continue;
             }
-
+            
             if(mg[j] != (__bridge void *)mb)
             {
                 continue;
             }
-
+            
             if(found != 0 && found != slot)
             {
                 NXPF_LOG("NSBundle main slot ambiguous");
@@ -406,13 +409,13 @@ static uint64_t ns_find_main_bundle_slot_off(void)
             found = slot;
         }
     }
-
+    
     if(found == 0)
     {
         NXPF_LOG("NSBundle main slot not found");
         return 0;
     }
-
+    
     return (uint64_t)(found - (uintptr_t)fInfo.dli_fbase);
 }
 
@@ -465,7 +468,7 @@ static void *findDyldFcntl17(const char *base)
             bl1End = count;
         }
         
-        for (size_t j = i + 1; j < bl1End; j++)
+        for(size_t j = i + 1; j < bl1End; j++)
         {
             if(!a64_is_bl(text[j]))
             {
@@ -479,7 +482,7 @@ static void *findDyldFcntl17(const char *base)
                 secondEnd = count;
             }
             
-            for (size_t k = j + 1; k < secondEnd; k++)
+            for(size_t k = j + 1; k < secondEnd; k++)
             {
                 if(text[k] != movFGetSigsInfo)
                 {
@@ -499,9 +502,7 @@ static void *findDyldFcntl17(const char *base)
                         continue;
                     }
                     
-                    uintptr_t target2 =
-                    a64_resolve_bl(&text[l]);
-                    
+                    uintptr_t target2 = a64_resolve_bl(&text[l]);
                     if(target1 == target2)
                     {
                         return (void *)target1;
@@ -738,7 +739,7 @@ static kern_return_t findDyldFunctionPointers(uint64_t out[kDyldPtrCount])
             entries[kDyldPtrFcntl].found = findDyldFcntl17(dyldBase);
         }
     }
-
+    
     /* CoreFoundation shit */
     cf_find_main_bundle_offs((uint64_t*)&entries[kCFBundleMainOffset].found, (uint64_t*)(uint64_t*)&entries[kCFBundleMainInitedOffset].found);
     entries[kNSBundleMainOffset].found = (void*)ns_find_main_bundle_slot_off();
@@ -759,7 +760,6 @@ static kern_return_t findDyldFunctionPointers(uint64_t out[kDyldPtrCount])
         "core_foundation.main_bundle_inited.off",
         
         "foundation.main_bundle.off",
-
     };
     
     bool entryNotFound = false;
@@ -784,16 +784,51 @@ static kern_return_t findDyldFunctionPointers(uint64_t out[kDyldPtrCount])
 }
 
 
-bool nxpf_resolve_base(uint32_t abi, uint64_t *out, size_t count)
+/* the resolved base table (once per process), NULL when it could not be resolved */
+static const uint64_t *nxpf_base_table(void)
 {
-    if(abi != NXPF_BASE_ABI || !out || !count || count > kDyldPtrCount) return false;
     static uint64_t base[kDyldPtrCount];
     static bool ready;
     static dispatch_once_t once;
     dispatch_once(&once, ^{ ready = findDyldFunctionPointers(base) == KERN_SUCCESS; });
-    if(ready) memcpy(out, base, count * sizeof(uint64_t));
-    return ready;
+    return ready ? base : NULL;
 }
+
+size_t nxpf_resolve(uint64_t *out,
+                    size_t capacity)
+{
+    const uint64_t *base = nxpf_base_table();
+    if(base == NULL)
+    {
+        return 0;
+    }
+    
+    if(out != NULL && capacity >= kDyldPtrCount)
+    {
+        memcpy(out, base, kDyldPtrCount * sizeof(uint64_t));
+    }
+    
+    return kDyldPtrCount;
+}
+
+bool nxpf_resolve_base(uint32_t abi,
+                       uint64_t *out,
+                       size_t count)
+{
+    if(abi != NXPF_BASE_ABI || !out || !count || count > kDyldPtrCount)
+    {
+        return false;
+    }
+    
+    const uint64_t *base = nxpf_base_table();
+    if(base == NULL)
+    {
+        return false;
+    }
+    memcpy(out, base, count * sizeof(uint64_t));
+    return true;
+}
+
 void *nxpf_find_symbol(const char *image, const char *symbol)
 {
     if(!image || !symbol) return NULL;

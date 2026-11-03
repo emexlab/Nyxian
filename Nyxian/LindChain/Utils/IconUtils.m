@@ -21,7 +21,7 @@
 */
 
 #import <UIKit/UIKit.h>
-#import <LindChain/Services/bootstrapd/ISIcon.h>
+#import <Frameworks/LiveProcessLegacy/LindChain/Services/bootstrapd/ISIcon.h>
 #import <LindChain/Utils/IconUtils.h>
 #import <LindChain/Private/UIKitPrivate.h>
 

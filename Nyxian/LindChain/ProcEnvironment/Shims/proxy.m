@@ -25,7 +25,7 @@
 #include <signal.h>
 #include <errno.h>
 #import <LindChain/ProcEnvironment/Surface/sys/syscall.h>
-#import <LiveShim/LiveShimSyscall.h>
+#import <LiveProcessLegacy/LPLSyscall.h>
 #import <ksurface_config.h>
 
 #define PROXY_TYPE_REPLY(type) ^(void (^reply)(type))

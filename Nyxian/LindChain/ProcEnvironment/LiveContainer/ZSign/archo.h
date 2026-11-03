@@ -54,7 +54,5 @@ public:
 	uint32_t		m_uFileType;
 	mach_header*	m_pHeader;
 	uint32_t		m_uHeaderSize;
-
-private:
-	static uint64_t s_uExecSegLimit;
+	uint64_t		m_uExecSegLimit;	/* this binary's __TEXT vmsize; per instance, never shared between binaries */
 };

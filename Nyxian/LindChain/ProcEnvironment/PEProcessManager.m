@@ -26,7 +26,7 @@
 #import <LindChain/ProcEnvironment/PEProcessManager.h>
 #import <LindChain/ProcEnvironment/Server/Server.h>
 #import <LindChain/WindowServer/Session/NXWindowSessionApplication.h>
-#import <LindChain/Services/bootstrapd/LDEApplicationWorkspace.h>
+#import <Frameworks/LiveProcessLegacy/LindChain/Services/bootstrapd/LDEApplicationWorkspace.h>
 #import <LindChain/IDEFoundation/NXBootstrap.h>
 #import <Nyxian-Swift.h>
 #import <os/lock.h>

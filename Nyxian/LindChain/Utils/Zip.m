@@ -135,6 +135,32 @@ BOOL unzipArchiveAtPath(NSString *zipPath, NSString *destinationPath) {
 BOOL unzipArchiveAtPathWithoutParentDirectory(NSString *zipPath,
                                               NSString *destinationPath)
 {
+    return unzipArchiveAtPathWithoutParentDirectoryWithError(zipPath, destinationPath, NULL);
+}
+
+static void NXZipReportExtractionError(NSError **error,
+                                       struct archive *archive,
+                                       NSString *operation,
+                                       NSString *path)
+{
+    if(!error || *error)
+    {
+        return;
+    }
+    
+    const char *detail = archive_error_string(archive);
+    NSString *reason = detail ? [NSString stringWithUTF8String:detail] : @"libarchive returned no error description";
+    *error = [NSError errorWithDomain:@"org.emexlabs.nyxian.zip" code:1 userInfo:@{NSLocalizedDescriptionKey:[NSString stringWithFormat:@"ZIP extraction failed while %@ (%@): %@", operation, path, reason]}];
+}
+
+BOOL unzipArchiveAtPathWithoutParentDirectoryWithError(NSString *zipPath,
+                                                       NSString *destinationPath,
+                                                       NSError **error)
+{
+    if(error)
+    {
+        *error = nil;
+    }
     struct archive *a = archive_read_new();
     struct archive *ext = archive_write_disk_new();
     struct archive_entry *entry;
@@ -148,6 +174,7 @@ BOOL unzipArchiveAtPathWithoutParentDirectory(NSString *zipPath,
     if(r != ARCHIVE_OK)
     {
         NSLog(@"archive_read_open_filename() failed: %s", archive_error_string(a));
+        NXZipReportExtractionError(error, a, @"opening the archive", zipPath);
         archive_read_free(a);
         archive_write_free(ext);
         return NO;
@@ -173,15 +200,17 @@ BOOL unzipArchiveAtPathWithoutParentDirectory(NSString *zipPath,
         
         NSArray<NSString *> *remainingComponents = [components subarrayWithRange:NSMakeRange(1, components.count - 1)];
         
+        BOOL unsafe = !relativePath || relativePath.isAbsolutePath || [components containsObject:@".."];
         NSString *strippedPath = [NSString pathWithComponents:remainingComponents];
-        NSString *standardDestination = [destinationPath stringByStandardizingPath];
-        NSString *fullPath = [[destinationPath stringByAppendingPathComponent:strippedPath] stringByStandardizingPath];
-        NSString *destinationPrefix = [standardDestination stringByAppendingString:@"/"];
+        NSString *fullPath = [destinationPath stringByAppendingPathComponent:strippedPath];
         
-        if(![fullPath isEqualToString:standardDestination] &&
-           ![fullPath hasPrefix:destinationPrefix])
+        if(unsafe)
         {
             NSLog(@"Skipping unsafe archive path: %@", relativePath);
+            if(error && !*error)
+            {
+                *error = [NSError errorWithDomain:@"org.emexlabs.nyxian.zip" code:2 userInfo:@{NSLocalizedDescriptionKey:[NSString stringWithFormat:@"Unsafe ZIP entry: %@", relativePath]}];
+            }
             success = NO;
             continue;
         }
@@ -207,6 +236,7 @@ BOOL unzipArchiveAtPathWithoutParentDirectory(NSString *zipPath,
                 if(writeResult != ARCHIVE_OK)
                 {
                     NSLog(@"archive_write_data_block() failed: %s", archive_error_string(ext));
+                    NXZipReportExtractionError(error, ext, @"writing entry data", fullPath);
                     success = NO;
                     break;
                 }
@@ -215,6 +245,7 @@ BOOL unzipArchiveAtPathWithoutParentDirectory(NSString *zipPath,
             if(r != ARCHIVE_EOF && r != ARCHIVE_OK)
             {
                 NSLog(@"archive_read_data_block() failed: %s", archive_error_string(a));
+                NXZipReportExtractionError(error, a, @"reading entry data", relativePath);
                 success = NO;
             }
         }
@@ -225,6 +256,7 @@ BOOL unzipArchiveAtPathWithoutParentDirectory(NSString *zipPath,
     if(r != ARCHIVE_EOF)
     {
         NSLog(@"archive_read_next_header() failed: %s", archive_error_string(a));
+        NXZipReportExtractionError(error, a, @"reading the next entry", zipPath);
         success = NO;
     }
     

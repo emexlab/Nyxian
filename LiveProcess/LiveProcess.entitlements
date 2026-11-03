@@ -10,5 +10,9 @@
 	<true/>
 	<key>com.apple.developer.kernel.extended-virtual-addressing</key>
 	<true/>
+	<key>com.apple.security.application-groups</key>
+	<array>
+		<string>group.org.emexlabs.nyxian.shared</string>
+	</array>
 </dict>
 </plist>

@@ -20,29 +20,12 @@
  See LICENSE for the full license terms.
 */
 
-/*
- * Spawning, the way KSurface does it on the legacy path: a LiveProcess
- * NSExtension request whose userInfo carries the launch (PEExecutablePath,
- * PEArguments, PEEnvironment, PEFileTable, PEWorkingDirectory), the syscall
- * port (PESyscallPort), the host endpoint the guest runtime's posix_spawn
- * still talks to (PEEndpoint, ServerProtocol over NSXPC) and the sandbox
- * extensions it consumes before touching any file (PEFilePermissions).
- *
- * Recovery drops entitlements: every guest gets read-write on the whole
- * bootloader container and read on the bundle, every spawn is allowed.
- *
- * FrontBoard is only used at run time (dlopen + NSClassFromString) to learn
- * exit statuses, like KSurface's PEProcess does; without it the monitor in
- * rks_proc.c still notices every exit.
- */
-
 #import <Foundation/Foundation.h>
 #import <UIKit/UIKit.h>
 #import <LindChain/ProcEnvironment/PEFileTable.h>
 #import <LindChain/ProcEnvironment/PEFileHandle.h>
 #import <LindChain/ProcEnvironment/PEMachPort.h>
 #include "rks.h"
-#include <dlfcn.h>
 #include <spawn.h>
 #include <signal.h>
 #include <unistd.h>
@@ -63,19 +46,6 @@ extern char *sandbox_extension_issue_file(const char *extension_class, const cha
 - (void)setPreferredLanguages:(NSArray *)languages;
 @end
 
-@protocol RKSFrontBoard <NSObject>
-- (id)predicateMatchingIdentifier:(NSNumber *)identifier;   /* class methods, sent to the Class */
-- (id)handleForPredicate:(id)predicate error:(NSError **)error;
-- (id)sharedInstance;
-- (audit_token_t)auditToken;
-- (id)processForPID:(int)pid;
-- (id)registerProcessForAuditToken:(audit_token_t)token;
-- (void)addObserver:(id)observer;
-- (id)exitContext;
-- (id)underlyingContext;
-- (int)legacyCode;
-@end
-
 /* the guest runtime's host interface (LindChain/ProcEnvironment/Server/ServerProtocol.h) */
 @protocol ServerProtocol
 - (void)spawnProcessWithPath:(NSString *)path
@@ -88,100 +58,6 @@ extern char *sandbox_extension_issue_file(const char *extension_class, const cha
                    withReply:(void (^)(int64_t))reply;
 - (void)setSnapshot:(UIImage *)image;
 @end
-
-/* ----------------------------------------------------------------------
- *  FrontBoard exit statuses
- * -------------------------------------------------------------------- */
-
-@interface RKSProcessObserver : NSObject
-@property (nonatomic) pid_t pid;
-@end
-
-@implementation RKSProcessObserver
-
-- (void)processDidExit:(id)process
-{
-    int status = 0;
-    BOOL known = NO;
-    @try
-    {
-        id context = [(id<RKSFrontBoard>)process exitContext];
-        id underlying = [context respondsToSelector:@selector(underlyingContext)] ? [(id<RKSFrontBoard>)context underlyingContext] : nil;
-        if([underlying respondsToSelector:@selector(legacyCode)])
-        {
-            status = [(id<RKSFrontBoard>)underlying legacyCode];
-            known = YES;
-        }
-    }
-    @catch(NSException *exception)
-    {
-        known = NO;
-    }
-    rks_proc_exited(self.pid, known, status);
-}
-
-- (void)processWillExit:(id)process {}
-- (void)process:(id)process stateDidChangeFromState:(id)from toState:(id)to {}
-
-@end
-
-static void rks_frontboard_attach(rks_proc_t *proc)
-{
-    static dispatch_once_t once;
-    dispatch_once(&once, ^{
-        dlopen("/System/Library/PrivateFrameworks/FrontBoard.framework/FrontBoard", RTLD_NOW | RTLD_GLOBAL);
-    });
-
-    Class predicateClass = NSClassFromString(@"RBSProcessPredicate");
-    Class handleClass = NSClassFromString(@"RBSProcessHandle");
-    Class managerClass = NSClassFromString(@"FBProcessManager");
-    if(predicateClass == nil || handleClass == nil || managerClass == nil)
-    {
-        return;
-    }
-
-    @try
-    {
-        NSError *error = nil;
-        id predicate = [(id<RKSFrontBoard>)predicateClass predicateMatchingIdentifier:@(proc->pid)];
-        id handle = predicate ? [(id<RKSFrontBoard>)handleClass handleForPredicate:predicate error:&error] : nil;
-        if(handle == nil)
-        {
-            return;
-        }
-        audit_token_t token = [(id<RKSFrontBoard>)handle auditToken];
-        if((pid_t)token.val[5] != proc->pid)
-        {
-            return;
-        }
-        id manager = [(id<RKSFrontBoard>)managerClass sharedInstance];
-        id process = nil;
-        if([manager respondsToSelector:@selector(processForPID:)])
-        {
-            process = [(id<RKSFrontBoard>)manager processForPID:proc->pid];
-        }
-        if(process == nil)
-        {
-            process = [(id<RKSFrontBoard>)manager registerProcessForAuditToken:token];
-        }
-        if(process == nil || ![process respondsToSelector:@selector(addObserver:)])
-        {
-            return;
-        }
-        RKSProcessObserver *observer = [RKSProcessObserver new];
-        observer.pid = proc->pid;
-        [(id<RKSFrontBoard>)process addObserver:observer];
-
-        pthread_mutex_lock(&rks_proc_lock);
-        proc->process = (void *)CFBridgingRetain(process);
-        proc->observer = (void *)CFBridgingRetain(observer);
-        pthread_mutex_unlock(&rks_proc_lock);
-    }
-    @catch(NSException *exception)
-    {
-        rks_logf("FrontBoard unavailable for pid %d: %s", proc->pid, exception.reason.UTF8String ?: "?");
-    }
-}
 
 bool rks_extension_kill(void *extension, int sig)
 {
@@ -504,6 +380,8 @@ static pid_t rks_spawn_items(rks_proc_t *parent, NSDictionary *launch, short fla
         *error = ENOMEM;
         return -1;
     }
+    /* as early as possible: EVFILT_PROC does not replay an exit that happened before registration */
+    rks_proc_exit_watch(pid);
     pthread_mutex_lock(&rks_proc_lock);
     child->extension = (void *)CFBridgingRetain(extension);
     pthread_mutex_unlock(&rks_proc_lock);
@@ -518,7 +396,6 @@ static pid_t rks_spawn_items(rks_proc_t *parent, NSDictionary *launch, short fla
         }
     }
 
-    rks_frontboard_attach(child);
     rks_proc_release(child);
     return pid;
 }

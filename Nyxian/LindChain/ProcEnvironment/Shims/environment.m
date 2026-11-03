@@ -23,14 +23,15 @@
 #import <LindChain/ProcEnvironment/Surface/libkern/relax.h>
 #import <LindChain/ProcEnvironment/Surface/libkern/task_handoff.h>
 #import <LindChain/ProcEnvironment/LiveContainer/LCBootstrap.h>
-#import <LiveShim/LiveShimSyscall.h>
-#import <LiveShim/vroot.h>
-#import <LiveShim/patchcache.h>
+#import <LiveProcessLegacy/LPLSyscall.h>
+#import <LiveProcessLegacy/LPLVRoot.h>
+#import <LiveProcessLegacy/LPLLSPatchcache.h>
 #import <LindChain/Utils/CFTools.h>
 #import <ksurface_config.h>
 #import <dlfcn.h>
 #import <sys/resource.h>
 #import <objc/runtime.h>
+#include <Frameworks/libpatchfind/libpatchfind.h>
 
 #if !HOST_ENV
 
