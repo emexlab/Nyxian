@@ -185,6 +185,14 @@ NSDictionary *NXROMArchiveProofForFD(int fd,
         return nil;
     }
     
+#if NX_ROM_BOOTLOADER
+    if(NXTrustStoreReleaseRevocation(proof[@"digest"]) != NXTrustStoreRevocationNone)
+    {
+        NXROMFail(error, @"This ROM release was revoked by its publisher and can't be installed anymore.");
+        return nil;
+    }
+#endif /* NX_ROM_BOOTLOADER */
+    
     return proof;
 }
 

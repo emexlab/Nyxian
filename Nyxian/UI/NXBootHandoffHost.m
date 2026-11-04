@@ -25,7 +25,6 @@
 #include <stdio.h>
 #include <string.h>
 
-/* BootHandoff/README.md, "Files": CLOSED -> OPEN -> CLAIMED -> TRANSITIONING -> DONE, or REVOKED */
 typedef NS_ENUM(NSInteger, NXBootHandoffState) {
     NXBootHandoffStateClosed,
     NXBootHandoffStateOpen,
@@ -54,18 +53,12 @@ static BOOL NXBootHandoffLive(NXBootHandoffState state)
 
 static BOOL NXBootHandoffConsoleVisible(NXBootConsoleMode mode, BOOL verbose)
 {
-    switch(mode)
-    {
-        case NX_BOOT_CONSOLE_AUTO: return verbose;
-        case NX_BOOT_CONSOLE_HOST: return YES;
-        default: return NO;
-    }
+    return NO;
 }
 
-/* everything but AUTO with Verbose Boot off records the log, recovery replays it */
 static BOOL NXBootHandoffNeedsCapture(NXBootConsoleMode mode, BOOL verbose)
 {
-    return mode != NX_BOOT_CONSOLE_AUTO || verbose;
+    return mode != NX_BOOT_CONSOLE_AUTO;
 }
 
 static const char *NXBootHandoffConsoleName(NXBootConsoleMode mode)

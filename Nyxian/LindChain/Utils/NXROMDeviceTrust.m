@@ -22,6 +22,9 @@
 
 #import "NXROMDeviceTrust.h"
 #import "NXBootLockdown.h"
+#if NX_ROM_BOOTLOADER
+#import "NXTrustStore.h"
+#endif
 #import <LindChain/ProcEnvironment/Surface/key.h>
 #include <stdlib.h>
 #include <string.h>
@@ -137,6 +140,25 @@ NX_BOOT_ONLY BOOL NXROMDeviceSeal(NSString *root,
     BOOL ok = NXROMWriteSealWithSigningContext(root, proof, key ?: NSData.data, context, error);
     [key resetBytesInRange:NSMakeRange(0, key.length)];
     return ok;
+}
+
+BOOL NXROMDeviceCheckRevocation(NSString *root,
+                                NSError **error)
+{
+    NSDictionary *proof = NXROMDeviceReleaseProof(root, error);
+    if(proof == nil)
+    {
+        return NO;
+    }
+    if(NXTrustStoreReleaseRevocation(proof[@"digest"]) == NXTrustStoreRevocationBoot)
+    {
+        if(error)
+        {
+            *error = [NSError errorWithDomain:@"org.emexlabs.rom.signature" code:2 userInfo:@{NSLocalizedDescriptionKey:@"This ROM release was revoked by its publisher and can't boot anymore. Install a newer release."}];
+        }
+        return NO;
+    }
+    return YES;
 }
 
 #endif /* NX_ROM_BOOTLOADER */

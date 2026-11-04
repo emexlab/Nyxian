@@ -37,8 +37,8 @@ extern "C" {
 /* Who draws the verbose log. Can be changed at any time while the claim is live (NXBootHandoffSetConsoleModeV1). */
 typedef uint32_t NXBootConsoleMode;
 enum {
-    NX_BOOT_CONSOLE_AUTO   = 0, /* follow the user's Verbose Boot flag, host draws it (exactly 0.11.6.1) */
-    NX_BOOT_CONSOLE_HOST   = 1, /* host console shown, whatever the flag says */
+    NX_BOOT_CONSOLE_AUTO   = 0, /* host draws nothing and records nothing (0.11.6.1 drew the log on Verbose Boot) */
+    NX_BOOT_CONSOLE_HOST   = 1, /* the host never draws the log since 0.11.6.2: same as HIDDEN */
     NX_BOOT_CONSOLE_HIDDEN = 2, /* nothing drawn; the log is still recorded so recovery can replay it */
     NX_BOOT_CONSOLE_ROM    = 3, /* host draws nothing, every line goes to the client's consoleLine() */
 };
@@ -77,7 +77,7 @@ typedef struct NXBootHandoffTransitionV1 {
                                    NULL when the ROM has no NXSlotCreateWindow, see rootViewController */
     void *rootViewController;   /* UIViewController * from NXSlotMain. Without a slotWindow it is already a child of
                                    the boot view controller, laid out full screen *below* splashView, alpha 1 */
-    uint32_t consoleVisible;    /* the host console is on screen right now */
+    uint32_t consoleVisible;    /* the host console is on screen right now, always 0 since 0.11.6.2 */
     uint32_t reduceMotion;      /* UIAccessibility.isReduceMotionEnabled */
     void (*complete)(void *token);
     void *token;

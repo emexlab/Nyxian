@@ -38,6 +38,7 @@
 static const char NXTrustStoreDomain[] = "NXROM-TRUSTSTORE-v1";
 static const NSUInteger NXTrustStoreMaxSize = 1024 * 1024;
 static const NSUInteger NXTrustStoreMaxKeys = 256;
+static const NSUInteger NXTrustStoreMaxRevoked = 4096;
 
 static os_unfair_lock NXTrustStoreLock = OS_UNFAIR_LOCK_INIT;
 static NSDictionary *NXTrustStoreCache;
@@ -218,7 +219,33 @@ NSDictionary *NXTrustStoreParse(NSData *data,
         }
         [keys addObject:key2];
     }
-    NSMutableDictionary *store = [@{@"version":version, @"keys":keys} mutableCopy];
+    NSMutableDictionary<NSData *, NSNumber *> *revoked = [NSMutableDictionary dictionary];
+    id revokedEntries = body[@"revoked"];
+    if(revokedEntries != nil)
+    {
+        if(![revokedEntries isKindOfClass:NSArray.class] || [revokedEntries count] > NXTrustStoreMaxRevoked)
+        {
+            NXTrustStoreFail(error, @"TrustStore has a malformed revocation list.");
+            return nil;
+        }
+        for(id entry in revokedEntries)
+        {
+            NSData *digest2 = [entry isKindOfClass:NSDictionary.class] ? entry[@"digest"] : nil;
+            id boot = [entry isKindOfClass:NSDictionary.class] ? entry[@"boot"] : nil;
+            if(![digest2 isKindOfClass:NSData.class] || digest2.length != CC_SHA256_DIGEST_LENGTH || (boot != nil && ![boot isKindOfClass:NSNumber.class]))
+            {
+                NXTrustStoreFail(error, @"TrustStore has a malformed revocation list.");
+                return nil;
+            }
+            NXTrustStoreRevocation level = [boot boolValue] ? NXTrustStoreRevocationBoot : NXTrustStoreRevocationInstall;
+            if(revoked[digest2].integerValue < level)
+            {
+                revoked[digest2] = @(level);
+            }
+        }
+    }
+    
+    NSMutableDictionary *store = [@{@"version":version, @"keys":keys, @"revoked":revoked} mutableCopy];
     if([body[@"issued"] isKindOfClass:NSDate.class])
     {
         store[@"issued"] = body[@"issued"];
@@ -379,7 +406,18 @@ NSDictionary *NXTrustStoreStatus(void)
     NSMutableDictionary *status = [current mutableCopy];
     status[@"keys"] = @([current[@"keys"] count]);
     status[@"names"] = [current[@"keys"] valueForKey:@"name"];
+    status[@"revoked"] = @([current[@"revoked"] count]);
     return status;
+}
+
+NXTrustStoreRevocation NXTrustStoreReleaseRevocation(NSData *digest)
+{
+    if(![digest isKindOfClass:NSData.class])
+    {
+        return NXTrustStoreRevocationNone;
+    }
+    NSNumber *level = NXTrustStoreCurrent()[@"revoked"][digest];
+    return level ? (NXTrustStoreRevocation)level.integerValue : NXTrustStoreRevocationNone;
 }
 
 NX_BOOT_ONLY BOOL NXTrustStoreInstall(NSData *data,

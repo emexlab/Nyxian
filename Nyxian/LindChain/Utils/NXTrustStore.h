@@ -29,6 +29,14 @@ NS_ASSUME_NONNULL_BEGIN
 
 #if NX_ROM_BOOTLOADER
 
+typedef NS_ENUM(NSInteger, NXTrustStoreRevocation) {
+    NXTrustStoreRevocationNone = 0,
+    NXTrustStoreRevocationInstall = 1,
+    NXTrustStoreRevocationBoot = 2,
+};
+
+NXTrustStoreRevocation NXTrustStoreReleaseRevocation(NSData *digest);
+
 NSArray<NSDictionary *> *NXTrustStoreTrustedKeys(void);
 NSDictionary *NXTrustStoreStatus(void);
 NSDictionary * _Nullable NXTrustStoreParse(NSData *data, NSError **error);

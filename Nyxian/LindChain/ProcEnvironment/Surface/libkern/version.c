@@ -30,7 +30,7 @@
 
 #define KSURFACE_VERSION_LENGTH 4
 
-static int ksurface_version_buffer[KSURFACE_VERSION_LENGTH] = { 0, 11, 6, 2 };
+static int ksurface_version_buffer[KSURFACE_VERSION_LENGTH] = { 0, 11, 6, 3 };
 
 int ksurface_version_get_length(void)
 {

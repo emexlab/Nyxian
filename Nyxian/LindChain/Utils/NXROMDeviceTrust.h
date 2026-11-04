@@ -39,6 +39,7 @@ BOOL NXROMDeviceVerifyOTAExecutable(NSString *root, NSString *path);
 BOOL NXROMDeviceManualCommitRollback(NSString *root, NSError **error);
 BOOL NXROMDeviceCommitRollback(NSString *root, NSError **error);
 BOOL NXROMDeviceSeal(NSString *root, NSDictionary * _Nullable proof, NSData *context, NSError **error);
+BOOL NXROMDeviceCheckRevocation(NSString *root, NSError **error);
 
 #endif /* NX_ROM_BOOTLOADER */
 
