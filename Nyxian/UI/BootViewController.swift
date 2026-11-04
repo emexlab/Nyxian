@@ -440,6 +440,10 @@ private func currentNyxianVersion() -> String {
     Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "0.0.0"
 }
 
+private var bootloaderUserAgent: String {
+    "Nyxian/\(currentNyxianVersion()) (bootloader)"
+}
+
 private func compareVersions(_ a: String, _ b: String) -> ComparisonResult {
     let left = a.split(separator: ".").map { Int($0) ?? 0 }
     let right = b.split(separator: ".").map { Int($0) ?? 0 }
@@ -477,6 +481,7 @@ private func fetchAndStageInitialROM(progress: @escaping (Double, String) -> Voi
     guard initialROMSlotsAreEmpty() else { DispatchQueue.main.async { completion(nil) }; return }
     let nyxian = currentNyxianVersion()
     var request = URLRequest(url: otaFeedURL, cachePolicy: .reloadIgnoringLocalCacheData, timeoutInterval: 30)
+    request.setValue(bootloaderUserAgent, forHTTPHeaderField: "User-Agent")
     request.setValue("application/json", forHTTPHeaderField: "Accept")
     
     DispatchQueue.main.async { progress(0.0, "Checking for updates…") }
@@ -831,7 +836,8 @@ private func bootLog(_ message: String) {
 
 private func downloadTrustStore(timeout: TimeInterval) -> (data: Data?, failure: String?) {
     dispatchPrecondition(condition: .notOnQueue(.main))
-    let request = URLRequest(url: NXTrustStoreUpdateURL(), cachePolicy: .reloadIgnoringLocalCacheData, timeoutInterval: timeout)
+    var request = URLRequest(url: NXTrustStoreUpdateURL(), cachePolicy: .reloadIgnoringLocalCacheData, timeoutInterval: timeout)
+    request.setValue(bootloaderUserAgent, forHTTPHeaderField: "User-Agent")
     let done = DispatchSemaphore(value: 0)
     var result: (data: Data?, failure: String?) = (nil, "no answer")
     let task = URLSession.shared.dataTask(with: request) { data, response, error in

@@ -9,8 +9,8 @@ RomGen.py: Nyxian ROM templates, ROM signing keys and signed ROM ZIPs.
 
     RomGen.py genkey --name myrom
         creates your key pair: ~/.config/nyxian/romkey/myrom.key.pem (private,
-        stays with you) and myrom.pub.pem (public, send it to emexLabs with your
-        NXRomIdentifier(s) to be added to the TrustStore)
+        stays with you) and myrom.pub.pem (public: register it with your
+        NXRomIdentifier(s) on developer.emexlabs.org to get it into the TrustStore)
 
     RomGen.py sign MyROM.zip --key ~/.config/nyxian/romkey/myrom.key.pem
         checks the ROM's manifest and appends the release signature (NXROM001)
@@ -20,6 +20,9 @@ RomGen.py: Nyxian ROM templates, ROM signing keys and signed ROM ZIPs.
         your key for this ROM
 
     RomGen.py info MyROM.zip | KEY.pem       manifest and signer / key ID
+    RomGen.py prove --key myrom.key.pem 'CODE'
+        signs the code the Developer Portal (developer.emexlabs.org) shows when
+        you register a key, to prove the key is yours; the key stays here
     RomGen.py public myrom.key.pem           the public key again, if you lost it
 
 Nyxian only boots a ROM whose ZIP carries a release signature by a key in
@@ -203,9 +206,10 @@ def command_genkey(args):
     raw = raw_public_key(private, private=True)
     public.write_bytes(public_pem(raw))
     print(f'private key: {private}   (keep it secret and backed up, never share it)')
-    print(f'public key:  {public}   (send this file to emexLabs)')
+    print(f'public key:  {public}   (register it on developer.emexlabs.org)')
     print(f'key ID:      {key_id(raw)}')
-    print('Send the public key with the NXRomIdentifier(s) it should sign; once it is in the TrustStore,')
+    print('Register the public key with the NXRomIdentifier(s) it should sign on developer.emexlabs.org')
+    print('(RomGen.py prove signs the code the portal shows); once it is in the TrustStore,')
     print(f'sign with: RomGen.py sign YourROM.zip --key {private}')
 
 
@@ -213,6 +217,27 @@ def command_public(args):
     raw = raw_public_key(args.key, private=True)
     sys.stdout.write(public_pem(raw).decode())
     print(f'key ID: {key_id(raw)}', file=sys.stderr)
+
+
+PROOF_DOMAIN = b'NXROM-DEVPORTAL-PROOF-v1\0'
+
+
+def command_prove(args):
+    """ECDSA P-256 over SHA-256 of the domain and the portal's code, base64 DER: what the portal checks"""
+    import base64
+    key = Path(args.key).expanduser()
+    if b'PRIVATE KEY' not in key.read_bytes():
+        fail(f'{key} is not a private key: prove with NAME.key.pem, the key the .pub.pem belongs to')
+    raw = raw_public_key(key, private=True)
+    digest = hashlib.sha256(PROOF_DOMAIN + args.code.encode()).digest()
+    with tempfile.NamedTemporaryFile() as source:
+        source.write(digest)
+        source.flush()
+        signature = openssl('pkeyutl', '-sign', '-inkey', str(key), '-pkeyopt', 'digest:sha256', '-in', source.name)
+    if not verify_digest(raw, digest, signature):
+        fail('openssl made a signature that does not verify')
+    print(base64.b64encode(signature).decode())
+    print(f'key ID: {key_id(raw)}: paste the line above into the portal', file=sys.stderr)
 
 
 def command_sign(args):
@@ -2545,6 +2570,10 @@ def main():
     verify.add_argument('--public', help='a public key (PEM or DER)')
     verify.add_argument('--truststore', help='a TrustStore file, or "online" for the published one')
     verify.set_defaults(run=command_verify)
+    prove = commands.add_parser('prove', help="sign the Developer Portal's code to prove a key is yours")
+    prove.add_argument('code', help='the code the portal shows')
+    prove.add_argument('--key', required=True, help='your private key (NAME.key.pem)')
+    prove.set_defaults(run=command_prove)
     info = commands.add_parser('info', help='show a ROM ZIP or a key')
     info.add_argument('file')
     info.set_defaults(run=command_info)
