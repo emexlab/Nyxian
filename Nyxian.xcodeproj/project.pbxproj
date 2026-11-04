@@ -825,6 +825,7 @@
 				LindChain/ProcEnvironment/Surface/libkern/sys/systm.c,
 				LindChain/ProcEnvironment/Surface/libkern/sys/worker.c,
 				LindChain/ProcEnvironment/Surface/libkern/task_handoff.c,
+				LindChain/ProcEnvironment/Surface/libkern/version.c,
 				LindChain/ProcEnvironment/Surface/proc/insert.c,
 				LindChain/ProcEnvironment/Surface/proc/list.c,
 				LindChain/ProcEnvironment/Surface/proc/lookup.c,
@@ -2122,6 +2123,7 @@
 				ARCHS = "$(ARCHS_STANDARD)";
 				CODE_SIGN_STYLE = Automatic;
 				DEAD_CODE_STRIPPING = YES;
+				ENABLE_DEBUG_DYLIB = YES;
 				ENABLE_HARDENED_RUNTIME = YES;
 				GCC_VERSION = "";
 				HEADER_SEARCH_PATHS = (
@@ -2143,6 +2145,7 @@
 				ARCHS = "$(ARCHS_STANDARD)";
 				CODE_SIGN_STYLE = Automatic;
 				DEAD_CODE_STRIPPING = YES;
+				ENABLE_DEBUG_DYLIB = YES;
 				ENABLE_HARDENED_RUNTIME = YES;
 				GCC_VERSION = "";
 				HEADER_SEARCH_PATHS = (
@@ -3075,6 +3078,7 @@
 				DEAD_CODE_STRIPPING = NO;
 				DEBUG_INFORMATION_FORMAT = dwarf;
 				DEVELOPMENT_ASSET_PATHS = "";
+				ENABLE_DEBUG_DYLIB = NO;
 				ENABLE_ENHANCED_SECURITY = NO;
 				ENABLE_PREVIEWS = YES;
 				ENABLE_SECURITY_COMPILER_WARNINGS = YES;
@@ -3208,6 +3212,7 @@
 				CURRENT_PROJECT_VERSION = "$(BUILD_NUMBER)";
 				DEAD_CODE_STRIPPING = NO;
 				DEVELOPMENT_ASSET_PATHS = "";
+				ENABLE_DEBUG_DYLIB = NO;
 				ENABLE_ENHANCED_SECURITY = NO;
 				ENABLE_PREVIEWS = YES;
 				ENABLE_SECURITY_COMPILER_WARNINGS = YES;

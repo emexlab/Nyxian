@@ -843,7 +843,7 @@
                             scale:(CGFloat)scale
 {
     LDEApplicationObject *obj = [[LDEApplicationWorkspace shared] applicationObjectForBundleID:bundleIdentifier];
-    if(obj && obj.icon)
+    if(obj)
     {
         CGSize targetSize;
         {
@@ -874,6 +874,15 @@
             }
         }
     got_size:
+        if(obj.icon == nil)
+        {
+            UIImage *generic = Gib26FallbackIcon(targetSize, scale);
+            if(generic != nil)
+            {
+                return generic;
+            }
+        }
+        else
         {
             if(@available(iOS 26.0, *))
             {

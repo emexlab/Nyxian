@@ -25,6 +25,7 @@
 #import <LindChain/ProcEnvironment/Surface/trust/signing.h>
 #import <LindChain/ProcEnvironment/Surface/libkern/kxld/kxopen.h>
 #import <LindChain/ProcEnvironment/Surface/libkern/klog.h>
+#import <LindChain/ProcEnvironment/Surface/libkern/version.h>
 #import <sys/stat.h>
 #import <sys/sysctl.h>
 
@@ -434,7 +435,7 @@ void ksurface_kext_free_deps(kmod_dependency_t *deps)
     PEKext *kext = [[self alloc] init];
     kext.executablePath = @"ksurface";
     kext.bundleID = @"ksurface";
-    kext.version = @"0.11.5";
+    kext.version = [NSString stringWithFormat:@"%s", ksurface_version_get_string()];
     kext.abi_version = KSURFACE_KMOD_ABI_VERSION;
     kext.flags = KMOD_FLAG_PERSISTENT | KMOD_FLAG_OVERRIDE_CORE | KMOD_FLAG_ALLOW_UNRESOLVED;
     

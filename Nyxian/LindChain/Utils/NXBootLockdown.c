@@ -48,7 +48,8 @@ bool NXBootLockdown(void)
     
     /* checking if necessary __BOOTONLY region exists */
     unsigned long length = 0;
-    uint8_t *start = getsegmentdata(&_mh_execute_header, "__BOOTONLY", &length);
+    extern const struct mach_header_64 __dso_handle;
+    uint8_t *start = getsegmentdata(&__dso_handle, "__BOOTONLY", &length);
     if(start == NULL || length == 0 || NXBootLockdownProbe() != 0x4E58)
     {
         return false;

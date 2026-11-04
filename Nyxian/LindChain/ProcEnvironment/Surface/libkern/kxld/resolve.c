@@ -24,6 +24,7 @@
 #include <LindChain/ProcEnvironment/Surface/libkern/kxld/pseudo.h>
 #include <LindChain/ProcEnvironment/Surface/libkern/radix/radix.h>
 #include <LindChain/ProcEnvironment/Surface/libkern/patch.h>
+#include <LindChain/ProcEnvironment/Surface/libkern/version.h>
 #include <sys/sysctl.h>
 #include <dlfcn.h>
 #include <os/lock.h>
@@ -189,8 +190,15 @@ static void register_nximage(void)
         kpanic("failed to create pseudo kext for 'com.apple.ios'.");
     }
     
+    size_t length = (size_t)ksurface_version_get_length();
+    int version_buffer[length];
+    if(ksurface_version_get_buffer(version_buffer, &length) != KERN_SUCCESS)
+    {
+        kpanic("failed to get the version of ksurface.");
+    }
+        
     kxld_image_info_t *ksurface_image_info = NULL;
-    kr = kxopen_pseudo("ksurface", KMOD_VERSION(0, 11, 5), KMOD_FLAG_PERSISTENT | KMOD_FLAG_OVERRIDE_CORE | KMOD_FLAG_ALLOW_UNRESOLVED, &ksurface_image_info);
+    kr = kxopen_pseudo("ksurface", KMOD_VERSION(version_buffer[0], version_buffer[1], version_buffer[2]), KMOD_FLAG_PERSISTENT | KMOD_FLAG_OVERRIDE_CORE | KMOD_FLAG_ALLOW_UNRESOLVED, &ksurface_image_info);
     if(kr != KERN_SUCCESS)
     {
         kpanic("failed to create pseudo kext for 'ksurface'.");

@@ -22,6 +22,7 @@
 
 #include <LindChain/ProcEnvironment/Surface/libkern/klog.h>
 #include <LindChain/ProcEnvironment/Surface/libkern/kpanic.h>
+#include <LindChain/ProcEnvironment/Surface/libkern/version.h>
 #include <stdio.h>
 #include <stdarg.h>
 #include <mach/mach.h>
@@ -149,7 +150,7 @@ void kpanic(const char *fmt, ...)
     
     /* structured block */
     kpanic_append("Debugger message: panic\n");
-    kpanic_append("Kernel version: %s + ksurface 0.11.5\n", xnu_version_string());
+    kpanic_append("Kernel version: %s + ksurface %s\n", xnu_version_string(), ksurface_version_get_string());
     kpanic_append("Paniclog version: %u\n", g_kpanic_header.version);
     kpanic_append("Kernel slide: 0x%016llx\n", (uint64_t)_dyld_get_image_vmaddr_slide(0));
     kpanic_append("Kernel text base: 0x%016llx\n", (uint64_t)_dyld_get_image_header(0));
