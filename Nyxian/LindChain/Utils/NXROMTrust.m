@@ -379,8 +379,8 @@ static NSDictionary *NXROMInventory(NSString *root,
     return inventory;
 }
 
-static NSData *NXROMSealMAC(NSData *payload,
-                            NSData *key)
+NX_BOOT_ONLY static NSData *NXROMSealMAC(NSData *payload,
+                                         NSData *key)
 {
     CCHmacContext context;
     unsigned char mac[CC_SHA256_DIGEST_LENGTH];
