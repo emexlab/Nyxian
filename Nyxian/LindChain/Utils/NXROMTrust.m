@@ -26,10 +26,6 @@
 #if NX_ROM_BOOTLOADER
 #import "NXTrustStore.h"
 #endif
-#ifndef NX_ROM_PUBLIC_KEY_HEADER
-#define NX_ROM_PUBLIC_KEY_HEADER "NXROMPublicKey.h"
-#endif
-#import NX_ROM_PUBLIC_KEY_HEADER
 #import <Security/Security.h>
 #import <CommonCrypto/CommonDigest.h>
 #import <CommonCrypto/CommonHMAC.h>

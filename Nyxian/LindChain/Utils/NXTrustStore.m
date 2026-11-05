@@ -25,7 +25,6 @@
 #if NX_ROM_BOOTLOADER
 
 #import "NXTrustStoreRootKeys.h"
-#import "NXROMPublicKey.h"
 #import "NXROMRollback.h"
 #import "NXBootLockdown.h"
 #import <Security/Security.h>
@@ -322,12 +321,6 @@ NX_BOOT_ONLY static BOOL NXTrustStoreWriteFloor(uint64_t version,
     return YES;
 }
 
-static NSDictionary *NXTrustStoreBuiltIn(void)
-{
-    NSData *publicKey = [NSData dataWithBytes:NXROMPublicKey length:sizeof(NXROMPublicKey)];
-    return @{@"version":@0, @"source":@"built-in", @"keys":@[@{@"id":NXTrustStoreSHA256(publicKey), @"publicKey":publicKey, @"name":@"built-in ROM release key"}]};
-}
-
 static NSDictionary *NXTrustStoreLoad(void)
 {
     uint64_t floor = 0;
@@ -355,10 +348,6 @@ static NSDictionary *NXTrustStoreLoad(void)
     {
         status = [best mutableCopy];
         status[@"source"] = source;
-    }
-    else if(readable && floor == 0 && NX_TRUSTSTORE_MIN_VERSION == 0)
-    {
-        status = [NXTrustStoreBuiltIn() mutableCopy];
     }
     else
     {
