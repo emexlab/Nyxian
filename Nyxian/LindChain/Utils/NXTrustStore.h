@@ -38,6 +38,7 @@ typedef NS_ENUM(NSInteger, NXTrustStoreRevocation) {
 NXTrustStoreRevocation NXTrustStoreReleaseRevocation(NSData *digest);
 
 NSArray<NSDictionary *> *NXTrustStoreTrustedKeys(void);
+NSArray<NSDictionary *> *NXTrustStoreTSSKeys(void);
 NSDictionary *NXTrustStoreStatus(void);
 NSDictionary * _Nullable NXTrustStoreParse(NSData *data, NSError **error);
 BOOL NXTrustStoreInstall(NSData *data, NSError **error);

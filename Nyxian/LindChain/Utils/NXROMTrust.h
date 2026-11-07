@@ -34,6 +34,9 @@ NSData * _Nullable NXROMSealedSigningContext(NSString *root, NSData *deviceKey, 
 NSDictionary * _Nullable NXROMSealedReleaseIdentity(NSString *root, NSData *deviceKey, NSError **error);
 BOOL NXROMVerifySeal(NSString *root, NSData *deviceKey, BOOL requireVendor, NSError **error);
 BOOL NXROMVerifySealedFile(NSString *root, NSString *relativePath, NSData *deviceKey, NSError **error);
+BOOL NXROMVerifyFileList(NSString *root, NSDictionary *proof, BOOL checkNXT2, NSError **error);
+BOOL NXROMProofRequiresTicket(NSDictionary *proof);
+BOOL NXROMProofIsTrusted(NSDictionary *proof);
 
 #if NX_ROM_BOOTLOADER
 

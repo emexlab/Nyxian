@@ -184,6 +184,7 @@ NSDictionary *NXTrustStoreParse(NSData *data,
         NSString *name = [entry isKindOfClass:NSDictionary.class] ? entry[@"name"] : nil;
         NSData *publicKey = [entry isKindOfClass:NSDictionary.class] ? entry[@"publicKey"] : nil;
         id roms = [entry isKindOfClass:NSDictionary.class] ? entry[@"roms"] : nil;
+        id usesTSS = [entry isKindOfClass:NSDictionary.class] ? entry[@"tss"] : nil;
         SecKeyRef check = [publicKey isKindOfClass:NSData.class] ? NXTrustStoreCreateKey(publicKey) : NULL;
         if(check)
         {
@@ -210,8 +211,13 @@ NSDictionary *NXTrustStoreParse(NSData *data,
                 }
             }
         }
+        if(usesTSS != nil && (![usesTSS isKindOfClass:NSNumber.class] || CFGetTypeID((__bridge CFTypeRef)usesTSS) != CFBooleanGetTypeID()))
+        {
+            NXTrustStoreFail(error, @"TrustStore key has a malformed tss setting.");
+            return nil;
+        }
         [seen addObject:publicKey];
-        NSMutableDictionary *key2 = [@{@"id":NXTrustStoreSHA256(publicKey), @"publicKey":publicKey, @"name":name} mutableCopy];
+        NSMutableDictionary *key2 = [@{@"id":NXTrustStoreSHA256(publicKey), @"publicKey":publicKey, @"name":name, @"tss":@(usesTSS == nil || [usesTSS boolValue])} mutableCopy];
         if(roms != nil)
         {
             key2[@"roms"] = [roms copy];
@@ -244,7 +250,34 @@ NSDictionary *NXTrustStoreParse(NSData *data,
         }
     }
     
-    NSMutableDictionary *store = [@{@"version":version, @"keys":keys, @"revoked":revoked} mutableCopy];
+    NSMutableArray<NSDictionary *> *tss = [NSMutableArray array];
+    id tssEntries = body[@"tss"];
+    if(tssEntries != nil)
+    {
+        if(![tssEntries isKindOfClass:NSArray.class] || [tssEntries count] > NXTrustStoreMaxKeys)
+        {
+            NXTrustStoreFail(error, @"TrustStore has a malformed TSS key list.");
+            return nil;
+        }
+        for(id entry in tssEntries)
+        {
+            NSString *name = [entry isKindOfClass:NSDictionary.class] ? entry[@"name"] : nil;
+            NSData *publicKey = [entry isKindOfClass:NSDictionary.class] ? entry[@"publicKey"] : nil;
+            SecKeyRef check = [publicKey isKindOfClass:NSData.class] ? NXTrustStoreCreateKey(publicKey) : NULL;
+            if(check)
+            {
+                CFRelease(check);
+            }
+            if(![name isKindOfClass:NSString.class] || name.length == 0 || check == NULL)
+            {
+                NXTrustStoreFail(error, @"TrustStore has a malformed TSS key.");
+                return nil;
+            }
+            [tss addObject:@{@"id":NXTrustStoreSHA256(publicKey), @"publicKey":publicKey, @"name":name}];
+        }
+    }
+    
+    NSMutableDictionary *store = [@{@"version":version, @"keys":keys, @"revoked":revoked, @"tss":tss} mutableCopy];
     if([body[@"issued"] isKindOfClass:NSDate.class])
     {
         store[@"issued"] = body[@"issued"];
@@ -389,6 +422,12 @@ NSArray<NSDictionary *> *NXTrustStoreTrustedKeys(void)
     return NXTrustStoreCurrent()[@"keys"];
 }
 
+NSArray<NSDictionary *> *NXTrustStoreTSSKeys(void)
+{
+    NSArray *tss = NXTrustStoreCurrent()[@"tss"];
+    return [tss isKindOfClass:NSArray.class] ? tss : @[];
+}
+
 NSDictionary *NXTrustStoreStatus(void)
 {
     NSDictionary *current = NXTrustStoreCurrent();
@@ -396,6 +435,7 @@ NSDictionary *NXTrustStoreStatus(void)
     status[@"keys"] = @([current[@"keys"] count]);
     status[@"names"] = [current[@"keys"] valueForKey:@"name"];
     status[@"revoked"] = @([current[@"revoked"] count]);
+    status[@"tss"] = @(NXTrustStoreTSSKeys().count);
     return status;
 }
 

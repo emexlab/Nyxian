@@ -39,14 +39,15 @@
 #import <LindChain/Utils/NXBootCertificate.h>
 #import <LindChain/Utils/NXROMTrust.h>
 #import <LindChain/Utils/NXROMDeviceTrust.h>
+#import <LindChain/Utils/NXBootPolicy.h>
 #import <LindChain/Utils/NXBootLockdown.h>
 #import <LindChain/Utils/NXTrustStore.h>
+#import <LindChain/Utils/NXDeviceIdentity.h>
+#import <LindChain/Utils/NXROMTicket.h>
 
 #import <LindChain/ProcEnvironment/Surface/trust/signing.h>
 
 #include "../LiveProcess/NXLiveProcessABI.h"
-#include "../BootHandoff/NXBootHandoff.h"
-#import <UI/NXBootHandoffHost.h>
 #import <UI/NXBootArgumentsHost.h>
 
 #endif /* BOOTBRIDGE_H */

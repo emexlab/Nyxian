@@ -24,7 +24,9 @@
 #import "NXBootLockdown.h"
 #if NX_ROM_BOOTLOADER
 #import "NXTrustStore.h"
-#endif
+#import "NXROMTicket.h"
+#import "NXBootPolicy.h"
+#endif /* NX_ROM_BOOTLOADER */
 #import <LindChain/ProcEnvironment/Surface/key.h>
 #include <stdlib.h>
 #include <string.h>
@@ -95,21 +97,6 @@ NSData *NXROMDeviceSigningContext(NSString *root,
     return context;
 }
 
-BOOL NXROMDeviceVerifyOTAExecutable(NSString *root,
-                                    NSString *path)
-{
-    NSString *expected = [root stringByAppendingPathComponent:@"binpack/usr/bin/otaupd"].stringByStandardizingPath.stringByResolvingSymlinksInPath;
-    if(![path.stringByStandardizingPath.stringByResolvingSymlinksInPath isEqual:expected])
-    {
-        return NO;
-    }
-    
-    NSMutableData *key = NXROMDeviceKey();
-    BOOL ok = NXROMVerifySealedFile(root, @"binpack/usr/bin/otaupd", key ?: NSData.data, NULL);
-    [key resetBytesInRange:NSMakeRange(0,key.length)];
-    return ok;
-}
-
 #if NX_ROM_BOOTLOADER
 
 NX_BOOT_ONLY BOOL NXROMDeviceManualCommitRollback(NSString *root,
@@ -142,6 +129,16 @@ NX_BOOT_ONLY BOOL NXROMDeviceSeal(NSString *root,
     return ok;
 }
 
+NX_BOOT_ONLY BOOL NXROMDeviceVerifyRelease(NSString *root,
+                                           NSError **error)
+{
+    NSMutableData *key = NXROMDeviceKey();
+    BOOL ok = NXROMVerifySeal(root, key ?: NSData.data, YES, error);
+    NSDictionary *proof = ok ? NXROMSealedReleaseProof(root, key ?: NSData.data, error) : nil;
+    [key resetBytesInRange:NSMakeRange(0, key.length)];
+    return proof != nil && NXROMVerifyFileList(root, proof, YES, error);
+}
+
 BOOL NXROMDeviceCheckRevocation(NSString *root,
                                 NSError **error)
 {
@@ -159,6 +156,50 @@ BOOL NXROMDeviceCheckRevocation(NSString *root,
         return NO;
     }
     return YES;
+}
+
+BOOL NXROMDeviceCheckTicket(NSString *root,
+                            NSError **error)
+{
+    NSDictionary *identity = NXROMDeviceIdentity(root, error);
+    NSDictionary *proof = identity ? NXROMDeviceReleaseProof(root, error) : nil;
+    if(proof == nil)
+    {
+        return NO;
+    }
+    
+    NSData *ticket = proof[@"ticket"];
+    if(![ticket isKindOfClass:NSData.class] && !NXROMProofRequiresTicket(proof))
+    {
+        return YES;
+    }
+    
+#if DEBUG
+    BOOL tolerant = YES;
+#else
+    BOOL tolerant = !NXBootPolicyTSSValidation();
+#endif
+    if(tolerant)
+    {
+        if([ticket isKindOfClass:NSData.class])
+        {
+            NSError *problem = nil;
+            if(NXROMTicketVerify(ticket, identity[@"identifier"], identity[@"digest"], nil, &problem) == nil)
+            {
+                NSLog(@"[bootloader] TSS validation off: the slot's install ticket doesn't verify (%@), booting it anyway", problem.localizedDescription);
+            }
+        }
+        return YES;
+    }
+    if(![ticket isKindOfClass:NSData.class])
+    {
+        if(error)
+        {
+            *error = [NSError errorWithDomain:@"org.emexlabs.rom.ticket" code:5 userInfo:@{NSLocalizedDescriptionKey:@"This ROM has no install ticket for this device. Install a signed release again (it needs the internet once)."}];
+        }
+        return NO;
+    }
+    return NXROMTicketVerify(ticket, identity[@"identifier"], identity[@"digest"], nil, error) != nil;
 }
 
 #endif /* NX_ROM_BOOTLOADER */

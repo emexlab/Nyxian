@@ -4,7 +4,7 @@ RomGen.py: Nyxian ROM templates, ROM signing keys and signed ROM ZIPs.
 
     RomGen.py generate <nyxian-root> <out-dir> [--identifier com.vendor.rom] [--name "My ROM"]
         bakes a ROM template from a Nyxian checkout (the kernel surface, the
-        window server, an NXSlotMain, the boot screen handoff and a Hello app);
+        window server, an NXSlotMain and a Hello app);
         `make` in it builds the signed rom.zip
 
     RomGen.py genkey --name myrom
@@ -13,7 +13,8 @@ RomGen.py: Nyxian ROM templates, ROM signing keys and signed ROM ZIPs.
         NXRomIdentifier(s) on developer.emexlabs.org to get it into the TrustStore)
 
     RomGen.py sign MyROM.zip --key ~/.config/nyxian/romkey/myrom.key.pem
-        checks the ROM's manifest and appends the release signature (NXROM001)
+        checks the ROM's manifest, puts the signed file list (NXRomFiles.plist) in
+        and appends the release signature (NXROM001)
 
     RomGen.py verify MyROM.zip [--public myrom.pub.pem] [--truststore truststore.plist|online]
         checks the signature; with the TrustStore also whether Nyxian trusts
@@ -24,6 +25,8 @@ RomGen.py: Nyxian ROM templates, ROM signing keys and signed ROM ZIPs.
         signs the code the Developer Portal (developer.emexlabs.org) shows when
         you register a key, to prove the key is yours; the key stays here
     RomGen.py public myrom.key.pem           the public key again, if you lost it
+    RomGen.py digest MyROM.zip                the release's digest: sign it on your key's Developer Portal page,
+                                              so devices get install tickets for it (bootloader 0.11.6.4+)
 
 Nyxian only boots a ROM whose ZIP carries a release signature by a key in
 emexLabs' TrustStore. A ROM ZIP holds one top-level directory (its name does
@@ -31,6 +34,15 @@ not matter) with manifest.plist: NXRomManifestVersion, NXRomIdentifier
 (reverse DNS), NXRomName, NXRomVersion, NXRomMinimumNyxianVersion,
 NXRomExecutable and NXRomSecurityVersion (a positive integer; raise it for
 every release, Nyxian refuses to go back to a lower one).
+
+The signed file list (NXRomFiles.plist, next to manifest.plist) holds every file,
+folder and symlink of the ROM with its hash, signed with the same key. Nyxian
+re-signs the ROM's Mach-O files with the user's certificate when it flashes it,
+and checks at every boot that nothing but their code signature changed: a slot
+with anything else in it doesn't boot (bootloader 0.11.6.4+). The hash of a
+Mach-O leaves out exactly what re-signing changes (see file_hash), so every
+Mach-O needs a code signature already; sign leaves unsigned ones signed ad hoc
+(codesign, on macOS).
 
 Needs Python 3 and the openssl command line.
 """
@@ -48,8 +60,10 @@ import zipfile
 from collections import defaultdict
 from pathlib import Path
 
-GEN_ROM_REV = '2026-11-03-ROMGEN-3'
+GEN_ROM_REV = '2026-11-06-ROMGEN-4'
 ARCHIVE_DOMAIN = b'NXROM-ARCHIVE-v1\0'
+FILES_DOMAIN = b'NXROM-FILES-v1\0'
+FILES_NAME = 'NXRomFiles.plist'
 STORE_DOMAIN = b'NXROM-TRUSTSTORE-v1\0'
 FOOTER = struct.Struct('<72sQI8s')
 MAGIC = b'NXROM001'
@@ -171,6 +185,10 @@ def read_manifest(path):
         return manifest
 
 
+def read_top(archive):
+    return {name.split('/', 1)[0] for name in archive.namelist() if name and not name.startswith('__MACOSX/')}.pop()
+
+
 def load_truststore(source):
     if source == 'online':
         import urllib.request
@@ -189,6 +207,291 @@ def load_truststore(source):
                                          envelope.get('signature', b'')):
         fail('the TrustStore is not signed by an emexLabs root key')
     return plistlib.loads(envelope['payload'])
+
+
+# MARK: the signed file list (NXRomFiles.plist): the hash of every file, the same as
+# Nyxian/LindChain/Utils/NXROMFileHash.h computes it. Keep the two equal.
+MACHO_DOMAIN = b'NXROM-MACHO-v1\0'
+FAT_DOMAIN = b'NXROM-FAT-v1\0'
+LC_SEGMENT_64, LC_CODE_SIGNATURE, LC_ID_DYLIB, LC_NX_LOADER = 0x19, 0x1d, 0x0d, 0x114514
+MH_EXECUTE, MH_DYLIB, MH_NO_REEXPORTED_DYLIBS, MH_PIE = 2, 6, 0x100000, 0x200000
+LIBCPP = b'/usr/lib/libc++.1.dylib\0'
+ZEROFILL = (0x1, 0xc, 0x12)
+
+
+class MachOError(ValueError):
+    pass
+
+
+def file_kind(data):
+    """'macho', 'unsupported' (32-bit or big endian Mach-O) or 'plain'"""
+    if len(data) < 4:
+        return 'plain'
+    magic = struct.unpack_from('<I', data)[0]
+    if magic in (0xfeedfacf, 0xbebafeca, 0xbfbafeca):
+        return 'macho'
+    if magic in (0xfeedface, 0xcefaedfe, 0xcffaedfe, 0xcafebabe, 0xcafebabf):
+        return 'unsupported'
+    return 'plain'
+
+
+def _inserted_id_dylib(command, name):
+    size = 24 + ((len(name) + 1 + 7) & ~7)
+    return (len(command) == size and struct.unpack_from('<IIII', command, 8) == (24, 2, 0x10000, 0x10000)
+            and command[24:24 + len(name)] == name and not any(command[24 + len(name):]))
+
+
+def _loader_command(command):
+    if len(command) < 24:
+        return False
+    offset = struct.unpack_from('<I', command, 8)[0]
+    return 24 <= offset < len(command) and len(command) - offset >= len(LIBCPP) and command[offset:offset + len(LIBCPP)] == LIBCPP
+
+
+def _thin(data, name):
+    if len(data) < 32 or struct.unpack_from('<I', data)[0] != 0xfeedfacf:
+        raise MachOError('not a 64-bit Mach-O')
+    filetype, ncmds, sizeofcmds, flags = struct.unpack_from('<IIII', data, 12)
+    if ncmds == 0 or sizeofcmds > len(data) - 32 or sizeofcmds > 1 << 24:
+        raise MachOError('malformed load commands')
+    end, offset, commands = 32 + sizeofcmds, 32, []
+    for _ in range(ncmds):
+        if end - offset < 8:
+            raise MachOError('malformed load commands')
+        cmd, size = struct.unpack_from('<II', data, offset)
+        if size < 8 or size % 8 or size > end - offset:
+            raise MachOError('malformed load commands')
+        if cmd == LC_SEGMENT_64 and (size < 72 or struct.unpack_from('<I', data, offset + 64)[0] > (size - 72) // 80):
+            raise MachOError('malformed segment')
+        commands.append((cmd, offset, size))
+        offset += size
+    if offset != end:
+        raise MachOError('malformed load commands')
+    signatures = [(offset, size) for cmd, offset, size in commands if cmd == LC_CODE_SIGNATURE]
+    if len(signatures) != 1:
+        raise MachOError('more than one code signature' if signatures else 'no code signature (sign it ad hoc: codesign -s -)')
+    if signatures[0][1] != 16:
+        raise MachOError('malformed LC_CODE_SIGNATURE')
+    dataoff = struct.unpack_from('<I', data, signatures[0][0] + 8)[0]
+    if dataoff < end or dataoff > len(data):
+        raise MachOError('the code signature lies outside the file')
+
+    content = dataoff
+    for cmd, offset, size in commands:
+        if cmd != LC_SEGMENT_64:
+            continue
+        fileoff, filesize = struct.unpack_from('<QQ', data, offset + 40)
+        if fileoff > 0 and filesize > 0:
+            content = min(content, fileoff)
+        for j in range(struct.unpack_from('<I', data, offset + 64)[0]):
+            section = offset + 72 + 80 * j
+            section_size = struct.unpack_from('<Q', data, section + 40)[0]
+            section_offset = struct.unpack_from('<I', data, section + 48)[0]
+            kind = struct.unpack_from('<I', data, section + 64)[0] & 0xff
+            if section_offset > 0 and section_size > 0 and kind not in ZEROFILL:
+                content = min(content, section_offset)
+    if content < end:
+        raise MachOError('the load commands overlap the code')
+    if any(data[end:content]):
+        raise MachOError('bytes between the load commands and the code')
+
+    kept = bytearray()
+    count = 0
+    for index, (cmd, offset, size) in enumerate(commands):
+        command = bytearray(data[offset:offset + size])
+        if cmd == LC_ID_DYLIB and index == 0 and _inserted_id_dylib(command, name):
+            continue
+        if cmd == LC_NX_LOADER:
+            if not _loader_command(command):
+                raise MachOError("a LiveContainer loader command that doesn't load libc++")
+            continue
+        if cmd == LC_SEGMENT_64:
+            segment = bytes(command[8:24]).split(b'\0', 1)[0]
+            if segment == b'__PAGEZERO':
+                command[24:40] = bytes(16)
+            elif segment == b'__LINKEDIT':
+                command[32:40] = bytes(8)
+                command[48:56] = bytes(8)
+        elif cmd == LC_CODE_SIGNATURE:
+            command[12:16] = bytes(4)
+        kept += command
+        count += 1
+    header = bytearray(data[:32])
+    struct.pack_into('<IIII', header, 12, MH_DYLIB if filetype in (MH_EXECUTE, MH_DYLIB) else filetype, count, len(kept),
+                     flags & ~(MH_NO_REEXPORTED_DYLIBS | MH_PIE))
+    return hashlib.sha256(MACHO_DOMAIN + bytes(header) + bytes(kept) + data[content:dataoff]).digest()
+
+
+def file_hash(data, name):
+    """the file's hash in NXRomFiles.plist; name is its file name. MachOError for a Mach-O the list can't take"""
+    data = bytes(data)
+    name = name.encode() if isinstance(name, str) else name
+    kind = file_kind(data)
+    if kind == 'unsupported':
+        raise MachOError('a 32-bit or big endian Mach-O')
+    if kind == 'plain':
+        return hashlib.sha256(data).digest()
+    if struct.unpack_from('<I', data)[0] == 0xfeedfacf:
+        return _thin(data, name)
+    wide = struct.unpack_from('<I', data)[0] == 0xbfbafeca
+    if len(data) < 8:
+        raise MachOError('malformed fat header')
+    slices = struct.unpack_from('>I', data, 4)[0]
+    entry = 32 if wide else 20
+    if not 0 < slices <= 16 or 8 + entry * slices > len(data):
+        raise MachOError('malformed fat header')
+    digest = hashlib.sha256(FAT_DOMAIN + data[4:8])
+    for i in range(slices):
+        arch = 8 + entry * i
+        offset, length = struct.unpack_from('>QQ' if wide else '>II', data, arch + 8)
+        if offset > len(data) or length > len(data) - offset:
+            raise MachOError('a fat slice lies outside the file')
+        digest.update(data[arch:arch + 8] + _thin(data[offset:offset + length], name))
+    return digest.digest()
+
+
+def nxt2_plist(data):
+    """the entitlements plist of the NXT2 blob at the end of a file, None without one; MachOError for a broken one"""
+    if len(data) < 8:
+        return None
+    if data[-4:] == b'NXTR':
+        raise MachOError('an old NXTR blob')
+    if data[-4:] != b'NXT2':
+        return None
+    length = struct.unpack_from('<I', data, len(data) - 8)[0]
+    if length < 116 or length > 16384 or length + 8 > len(data):
+        raise MachOError('a malformed NXT2 blob')
+    blob = len(data) - 8 - length
+    contained = struct.unpack_from('<Q', data, blob + 28)[0]
+    if contained > length - 116:
+        raise MachOError('a malformed NXT2 blob')
+    return data[blob + 36:blob + 36 + contained]
+
+
+def sign_digest(key, digest):
+    signature = openssl('pkeyutl', '-sign', '-inkey', str(key), '-pkeyopt', 'digest:sha256', data=digest)
+    if not 8 <= len(signature) <= 72:
+        fail('openssl produced an invalid signature')
+    return signature
+
+
+def adhoc_sign(data, name, where):
+    """a Mach-O without a code signature, signed ad hoc (Nyxian replaces the signature with the user's when it flashes)"""
+    if shutil.which('codesign') is None:
+        fail(f'{where} has no code signature: sign it ad hoc (codesign -s - FILE) or sign the ROM on macOS')
+    with tempfile.TemporaryDirectory() as directory:
+        path = Path(directory) / name
+        path.write_bytes(data)
+        result = subprocess.run(['codesign', '--sign', '-', '--force', str(path)], capture_output=True)
+        if result.returncode:
+            fail(f'codesign could not sign {where} ad hoc: {result.stderr.decode(errors="replace").strip()}')
+        return path.read_bytes()
+
+
+def archive_entries(archive, sign_unsigned=False):
+    """(top, [(info, data)], files) of a ROM ZIP: what Nyxian extracts into a slot, the old file list and __MACOSX
+    left out. files is what NXRomFiles.plist lists: {path: {type: file, hash} | {type: directory} | {type: symlink,
+    target}}. With sign_unsigned, Mach-O files without a code signature come back signed ad hoc"""
+    infos = [info for info in archive.infolist() if info.filename and not info.filename.startswith('__MACOSX/')]
+    tops = {info.filename.split('/', 1)[0] for info in infos}
+    if len(tops) != 1:
+        fail('a ROM ZIP holds exactly one top-level directory')
+    top = tops.pop()
+    entries, files, directories, adhoc = [], {}, set(), []
+    for info in infos:
+        name = info.filename
+        if name.startswith('/') or '\\' in name:
+            fail(f'{name}: unsafe path in the ZIP')
+        relative = name[len(top) + 1:].rstrip('/')
+        if not relative:
+            entries.append((info, None))
+            continue
+        parts = relative.split('/')
+        if any(part in ('', '.', '..') for part in parts):
+            fail(f'{name}: unsafe path in the ZIP')
+        if relative == FILES_NAME:
+            continue
+        if relative in files or (relative in directories and not info.is_dir()):
+            fail(f'{name} is in the ZIP twice')
+        directories.update('/'.join(parts[:i]) for i in range(1, len(parts)))
+        if info.is_dir():
+            directories.add(relative)
+            entries.append((info, None))
+            continue
+        data = archive.read(info)
+        if (info.external_attr >> 16) & 0o170000 == 0o120000:
+            files[relative] = {'type': 'symlink', 'target': data.decode('utf-8')}
+        else:
+            try:
+                digest = file_hash(data, parts[-1])
+            except MachOError as error:
+                if not sign_unsigned or not str(error).startswith('no code signature'):
+                    fail(f'{relative}: {error}')
+                data = adhoc_sign(data, parts[-1], relative)
+                adhoc.append(relative)
+                try:
+                    digest = file_hash(data, parts[-1])
+                except MachOError as error:
+                    fail(f'{relative}: {error}')
+            files[relative] = {'type': 'file', 'hash': digest}
+        entries.append((info, data))
+    for directory in directories:
+        if directory in files:
+            fail(f'{top}/{directory} is a file and a folder at once')
+        files[directory] = {'type': 'directory'}
+    return top, entries, files, adhoc
+
+
+def file_list_payload(manifest, files):
+    return plistlib.dumps({'format': 1, 'identifier': manifest['NXRomIdentifier'], 'version': manifest['NXRomVersion'],
+                           'securityVersion': manifest['NXRomSecurityVersion'], 'files': files},
+                          fmt=plistlib.FMT_BINARY, sort_keys=True)
+
+
+def write_listed_archive(source, target, manifest, key):
+    """the ROM ZIP again, with unsigned Mach-O files signed ad hoc and the signed file list in it; returns (files,
+    adhoc)"""
+    with zipfile.ZipFile(source) as archive:
+        top, entries, files, adhoc = archive_entries(archive, sign_unsigned=True)
+        payload = file_list_payload(manifest, files)
+        listing = plistlib.dumps({'format': 1, 'payload': payload,
+                                  'signature': sign_digest(key, hashlib.sha256(FILES_DOMAIN + payload).digest())},
+                                 fmt=plistlib.FMT_BINARY, sort_keys=True)
+        with zipfile.ZipFile(target, 'w') as output:
+            for info, data in entries:
+                copy = zipfile.ZipInfo(info.filename, info.date_time)
+                copy.external_attr, copy.create_system, copy.compress_type = info.external_attr, info.create_system, info.compress_type
+                output.writestr(copy, b'' if data is None else data)
+            entry = zipfile.ZipInfo(f'{top}/{FILES_NAME}', entries[0][0].date_time if entries else (1980, 1, 1, 0, 0, 0))
+            entry.external_attr, entry.create_system, entry.compress_type = 0o100644 << 16, 3, zipfile.ZIP_DEFLATED
+            output.writestr(entry, listing)
+    return files, adhoc
+
+
+def verify_file_list(path, raw, manifest):
+    """the ZIP's NXRomFiles.plist: signed with raw, for this manifest, and every file in the ZIP matches it, the way
+    Nyxian checks a slot. Returns how many entries it lists"""
+    with zipfile.ZipFile(path) as archive:
+        top, _, files, _ = archive_entries(archive)
+        try:
+            listing = plistlib.loads(archive.read(f'{top}/{FILES_NAME}'))
+        except KeyError:
+            fail(f'{path.name} has no signed file list ({FILES_NAME}): sign it with RomGen.py {GEN_ROM_REV} or newer')
+    payload, signature = listing.get('payload'), listing.get('signature')
+    if listing.get('format') != 1 or not isinstance(payload, bytes) or not isinstance(signature, bytes):
+        fail(f'{FILES_NAME} is malformed')
+    if not verify_digest(raw, hashlib.sha256(FILES_DOMAIN + payload).digest(), signature):
+        fail(f'{FILES_NAME} is not signed with the key that signed the release')
+    body = plistlib.loads(payload)
+    if body.get('format') != 1 or body.get('identifier') != manifest['NXRomIdentifier'] \
+            or body.get('version') != manifest['NXRomVersion'] or body.get('securityVersion') != manifest['NXRomSecurityVersion']:
+        fail(f'{FILES_NAME} is for another release than manifest.plist')
+    listed = body.get('files')
+    if listed != files:
+        missing = sorted(set(files) ^ set(listed or {}))
+        changed = sorted(name for name in set(files) & set(listed or {}) if files[name] != listed[name])
+        fail(f'the ZIP does not match {FILES_NAME}: ' + ', '.join((missing + changed)[:5]))
+    return len(listed)
 
 
 def command_genkey(args):
@@ -247,22 +550,19 @@ def command_sign(args):
     if b'PRIVATE KEY' not in key.read_bytes():
         fail(f'{key} is not a private key')
     raw = raw_public_key(key, private=True)
-    length, old = read_footer(path)
-    digest = archive_digest(path, length)
-    signature = openssl('pkeyutl', '-sign', '-inkey', str(key), '-pkeyopt', 'digest:sha256', data=digest)
-    if not 8 <= len(signature) <= 72 or not verify_digest(raw, digest, signature):
-        fail('openssl produced an invalid signature')
+    _, old = read_footer(path)
     descriptor, name = tempfile.mkstemp(prefix=path.name + '.', dir=path.parent)
+    os.close(descriptor)
     temporary = Path(name)
     try:
-        with os.fdopen(descriptor, 'wb') as target, path.open('rb') as source:
-            remaining = length
-            while remaining:
-                chunk = source.read(min(remaining, 1 << 20))
-                if not chunk:
-                    fail('the archive changed while signing')
-                target.write(chunk)
-                remaining -= len(chunk)
+        # the archive again, with the signed file list in it; then the release signature over all of it
+        files, adhoc = write_listed_archive(path, temporary, manifest, key)
+        length = temporary.stat().st_size
+        digest = archive_digest(temporary, length)
+        signature = sign_digest(key, digest)
+        if not verify_digest(raw, digest, signature):
+            fail('openssl produced an invalid signature')
+        with temporary.open('ab') as target:
             target.write(FOOTER.pack(signature, length, len(signature), MAGIC))
             target.flush()
             os.fsync(target.fileno())
@@ -272,13 +572,17 @@ def command_sign(args):
         with zipfile.ZipFile(temporary) as archive:
             if archive.testzip() is not None:
                 fail('the signed ZIP is corrupt')
+        verify_file_list(temporary, raw, manifest)
         os.chmod(temporary, 0o644)
         os.replace(temporary, path)
     finally:
         temporary.unlink(missing_ok=True)
     action = 're-signed' if old else 'signed'
     print(f'{path}: {manifest["NXRomName"]} {manifest["NXRomVersion"]} ({manifest["NXRomIdentifier"]}, '
-          f'security version {manifest["NXRomSecurityVersion"]}) {action} with key {key_id(raw)}')
+          f'security version {manifest["NXRomSecurityVersion"]}) {action} with key {key_id(raw)}, '
+          f'{sum(entry["type"] == "file" for entry in files.values())} files in {FILES_NAME}')
+    if adhoc:
+        print(f'signed ad hoc first (they had no code signature): {", ".join(adhoc)}')
 
 
 def command_verify(args):
@@ -300,6 +604,7 @@ def command_verify(args):
         if verify_digest(raw, digest, signature):
             manifest = read_manifest(path)
             print(f'{path}: signed by {name} (key {key_id(raw)})')
+            print(f'{FILES_NAME}: {verify_file_list(path, raw, manifest)} entries, all match')
             if store is not None:
                 if roms is None and name == 'given key':
                     match = next((key for key in store['keys'] if key['publicKey'] == raw), None)
@@ -313,6 +618,16 @@ def command_verify(args):
     fail('the signature does not match ' + ('any key of the TrustStore' if store is not None and not args.public else 'the given key'))
 
 
+def command_digest(args):
+    """what the TSS knows a release by: the archive digest of the signed ZIP"""
+    path = Path(args.archive)
+    length, signature = read_footer(path)
+    if signature is None:
+        fail(f'{path.name} has no release signature (RomGen.py sign)')
+    print(archive_digest(path, length).hex())
+    print("sign it on your key's page on developer.emexlabs.org (Signed releases) so devices can install it", file=sys.stderr)
+
+
 def command_info(args):
     path = Path(args.file)
     if zipfile.is_zipfile(path):
@@ -321,6 +636,9 @@ def command_info(args):
             print(f'{key}: {manifest.get(key)}')
         _, signature = read_footer(path)
         print('release signature: ' + ('present (verify it with RomGen.py verify)' if signature else 'none'))
+        with zipfile.ZipFile(path) as archive:
+            top = read_top(archive)
+            print(f'signed file list ({FILES_NAME}): ' + ('present' if f'{top}/{FILES_NAME}' in archive.namelist() else 'none'))
     else:
         data = path.read_bytes()
         raw = raw_public_key(path, private=b'PRIVATE KEY' in data)
@@ -1509,51 +1827,6 @@ void NXSlotDidAppear(void)
 }
 '''
 
-NXBOOTGRAPHICS_M = r'''#import <UIKit/UIKit.h>
-#include <NXBootHandoff.h>
-
-static const NSTimeInterval NXBootGraphicsConsoleHold = 1.5;
-
-static void NXBootGraphicsTransition(void *context,
-                                     const NXBootHandoffTransitionV1 *transition)
-{
-    UIView *splash = (__bridge UIView *)transition->splashView;
-    UIWindow *slotWindow = (__bridge UIWindow *)transition->slotWindow;
-    void (*complete)(void *) = transition->complete;
-    void *token = transition->token;
-
-    NSTimeInterval hold = transition->consoleVisible ? NXBootGraphicsConsoleHold : 0;
-    NSTimeInterval duration = transition->reduceMotion ? 0.3 : 0.45;
-    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(hold * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
-        [UIView animateWithDuration:duration animations:^{
-            slotWindow.alpha = 1;
-            splash.alpha = 0;
-        } completion:^(BOOL finished) {
-            complete(token);
-        }];
-    });
-}
-
-__attribute__((constructor))
-static void NXBootGraphicsClaim(void)
-{
-    NXBootHandoffAPI api;
-    if(!NXBootHandoffResolve(&api))
-    {
-        return;
-    }
-
-    static const NXBootHandoffClientV1 client = {
-        .version = NX_BOOT_HANDOFF_VERSION,
-        .size = sizeof(NXBootHandoffClientV1),
-        .flags = 0,
-        .consoleMode = NX_BOOT_CONSOLE_AUTO,
-        .transition = NXBootGraphicsTransition,
-    };
-    api.claimV1(&client);
-}
-'''
-
 def nxmainslot_with_boot_args(source):
     def swap(text, old, new):
         if text.count(old) != 1:
@@ -2418,9 +2691,6 @@ def command_generate(args):
     for header in ('ksurface_abi.h', 'ksurface_config.h'):
         if (repo / header).is_file():
             shutil.copy2(repo / header, out / 'rom/include' / header)
-    boot_handoff = (repo / 'BootHandoff/NXBootHandoff.h').is_file()
-    if boot_handoff:
-        shutil.copy2(repo / 'BootHandoff/NXBootHandoff.h', out / 'rom/include/NXBootHandoff.h')
     boot_args = (repo / 'BootHandoff/NXBootArgs.h').is_file()
     if boot_args:
         shutil.copy2(repo / 'BootHandoff/NXBootArgs.h', out / 'rom/include/NXBootArgs.h')
@@ -2505,11 +2775,6 @@ def command_generate(args):
     (src / 'NXMainSlot.m').write_text(nxmainslot_with_boot_args(NXMAINSLOT_M) if boot_args else NXMAINSLOT_M)
     if boot_args:
         log('boot arguments: NXMainSlot.m reads them through rom/include/NXBootArgs.h (old keys on 0.11.6.1)')
-    if boot_handoff:
-        (src / 'NXBootGraphics.m').write_text(NXBOOTGRAPHICS_M)
-        log('boot screen handoff: rom/src/NXBootGraphics.m (bootloader 0.11.6.2+, still boots on older ones)')
-    else:
-        log('no BootHandoff/NXBootHandoff.h in this checkout, the template leaves the boot screen to the bootloader')
 
     makefile = MAKEFILE
     if signing_key:
@@ -2526,9 +2791,6 @@ def command_generate(args):
     if boot_args:
         readme += ('- `rom/include/NXBootArgs.h`: the boot arguments (Settings > General > Boot Arguments, bootloader\n'
                    '  0.11.6.2+), `NXMainSlot.m` reads `-x` and `klog_obfuscate` from them; old keys on 0.11.6.1.\n')
-    if boot_handoff:
-        readme += ('- `rom/src/NXBootGraphics.m`: the boot screen, handed over by the bootloader (0.11.6.2+): the\n'
-                   '  verbose console and the transition into the ROM. `rom/include/NXBootHandoff.h` is the ABI.\n')
     (out / 'README.md').write_text(readme)
     shutil.copy2(Path(__file__).resolve(), out / 'RomGen.py')
     log(f'done: {args.name} ({args.identifier}), minimum Nyxian {minimum}')
@@ -2574,6 +2836,9 @@ def main():
     prove.add_argument('code', help='the code the portal shows')
     prove.add_argument('--key', required=True, help='your private key (NAME.key.pem)')
     prove.set_defaults(run=command_prove)
+    digest = commands.add_parser('digest', help="the release digest the Developer Portal's TSS signs installs for")
+    digest.add_argument('archive')
+    digest.set_defaults(run=command_digest)
     info = commands.add_parser('info', help='show a ROM ZIP or a key')
     info.add_argument('file')
     info.set_defaults(run=command_info)

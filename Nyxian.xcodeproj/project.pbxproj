@@ -354,6 +354,7 @@
 		8FF647C63054E61900E1E610 /* bootstrapd.dylib */ = {isa = PBXFileReference; explicitFileType = archive.ar; includeInIndex = 0; path = bootstrapd.dylib; sourceTree = BUILT_PRODUCTS_DIR; };
 		8FF6480E3056786A00E1E610 /* MobileDevelopmentService.dylib */ = {isa = PBXFileReference; explicitFileType = archive.ar; includeInIndex = 0; path = MobileDevelopmentService.dylib; sourceTree = BUILT_PRODUCTS_DIR; };
 		8FFF7C113064D8B9002612E7 /* superslotfix.sh */ = {isa = PBXFileReference; lastKnownFileType = text.script.sh; path = superslotfix.sh; sourceTree = "<group>"; };
+		93C2C4FAE3F192B466194056 /* fetchtruststore.sh */ = {isa = PBXFileReference; lastKnownFileType = text.script.sh; path = fetchtruststore.sh; sourceTree = "<group>"; };
 		AF99171F2DC8EA3C00DDF895 /* Shared */ = {isa = PBXFileReference; lastKnownFileType = folder; path = Shared; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
@@ -1385,6 +1386,7 @@
 				8FF346DD3039AA7000C46FE4 /* ksurface_abi.h */,
 				8FB3C1EA3031450500DB3ABC /* ksurface_config.h */,
 				79277DC62EE8761000F18B30 /* version.sh */,
+				93C2C4FAE3F192B466194056 /* fetchtruststore.sh */,
 				8FFF7C113064D8B9002612E7 /* superslotfix.sh */,
 				79277DC02EE8752800F18B30 /* Config.xcconfig */,
 				AF99171F2DC8EA3C00DDF895 /* Shared */,
@@ -1702,6 +1704,7 @@
 				AF9916D52DC8C42200DDF895 /* Sources */,
 				AF9916D62DC8C42200DDF895 /* Frameworks */,
 				AF9916D72DC8C42200DDF895 /* Resources */,
+				FC2B32649EF25F219B0BC1C5 /* Bundle the Latest TrustStore */,
 				8F60087B3033F9200028EDFD /* Embed Foundation Extensions */,
 				8FF647BA3054D5EE00E1E610 /* CopyFiles */,
 				8F75F24030635D23004D9A49 /* Embed Frameworks */,
@@ -1861,6 +1864,28 @@
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXResourcesBuildPhase section */
+
+/* Begin PBXShellScriptBuildPhase section */
+		FC2B32649EF25F219B0BC1C5 /* Bundle the Latest TrustStore */ = {
+			isa = PBXShellScriptBuildPhase;
+			alwaysOutOfDate = 1;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+			);
+			name = "Bundle the Latest TrustStore";
+			outputFileListPaths = (
+			);
+			outputPaths = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "sh \"$SRCROOT/fetchtruststore.sh\"\n";
+		};
+/* End PBXShellScriptBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
 		79AA11B82F7FFE24002FEAF2 /* Sources */ = {
@@ -3082,6 +3107,7 @@
 				ENABLE_ENHANCED_SECURITY = NO;
 				ENABLE_PREVIEWS = YES;
 				ENABLE_SECURITY_COMPILER_WARNINGS = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = NO;
 				FRAMEWORK_SEARCH_PATHS = (
 					"$(inherited)",
 					"$(PROJECT_DIR)/Nyxian/LindChain",
@@ -3216,6 +3242,7 @@
 				ENABLE_ENHANCED_SECURITY = NO;
 				ENABLE_PREVIEWS = YES;
 				ENABLE_SECURITY_COMPILER_WARNINGS = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = NO;
 				FRAMEWORK_SEARCH_PATHS = (
 					"$(inherited)",
 					"$(PROJECT_DIR)/Nyxian/LindChain",

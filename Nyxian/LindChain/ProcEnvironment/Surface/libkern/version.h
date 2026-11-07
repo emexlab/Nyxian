@@ -23,6 +23,7 @@
 #ifndef LIBKERN_VERSION_H
 #define LIBKERN_VERSION_H
 
+#include <stddef.h>
 #include <stdint.h>
 #include <mach/kern_return.h>
 

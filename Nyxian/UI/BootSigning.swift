@@ -54,6 +54,7 @@ func validateBootSigningSnapshot(_ identity: BootSigningIdentity) throws {
 
 func requireBootSigning(showSetup: @escaping (BootSigningImportController) -> Void, completion: @escaping () -> Void) {
     DispatchQueue.global(qos: .userInitiated).async {
+        importNyxLoaderCertificate()
         do {
             _ = try currentBootSigningIdentity()
             DispatchQueue.main.async {

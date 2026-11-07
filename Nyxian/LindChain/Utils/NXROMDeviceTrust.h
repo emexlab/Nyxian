@@ -32,14 +32,15 @@ BOOL NXROMDeviceVerify(NSString *root, BOOL requireVendor, NSError **error);
 BOOL NXROMDeviceCheckRollback(NSString *root, BOOL allowUninitialized, NSError **error);
 NSDictionary * _Nullable NXROMDeviceReleaseProof(NSString *root, NSError **error);
 NSData * _Nullable NXROMDeviceSigningContext(NSString *root, NSError **error);
-BOOL NXROMDeviceVerifyOTAExecutable(NSString *root, NSString *path);
 
 #if NX_ROM_BOOTLOADER
 
 BOOL NXROMDeviceManualCommitRollback(NSString *root, NSError **error);
 BOOL NXROMDeviceCommitRollback(NSString *root, NSError **error);
 BOOL NXROMDeviceSeal(NSString *root, NSDictionary * _Nullable proof, NSData *context, NSError **error);
+BOOL NXROMDeviceVerifyRelease(NSString *root, NSError **error);
 BOOL NXROMDeviceCheckRevocation(NSString *root, NSError **error);
+BOOL NXROMDeviceCheckTicket(NSString *root, NSError **error);
 
 #endif /* NX_ROM_BOOTLOADER */
 

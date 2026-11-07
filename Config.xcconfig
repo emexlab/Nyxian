@@ -9,8 +9,8 @@
 // Configuration settings file format documentation can be found at:
 // https://developer.apple.com/documentation/xcode/adding-a-build-configuration-file-to-your-project
 
-VERSION = 0.11.6.4
-BUILD_NUMBER = 20261105.7.RELEASE
+VERSION = 0.12.1
+BUILD_NUMBER = 20261107.6.RELEASE
 
 NYXIAN_DEVELOPMENT_TEAM = L4A6CKH3TV
 DEVELOPMENT_TEAM = $(NYXIAN_DEVELOPMENT_TEAM)

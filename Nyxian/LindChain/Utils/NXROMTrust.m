@@ -25,11 +25,14 @@
 #import "NXBootLockdown.h"
 #if NX_ROM_BOOTLOADER
 #import "NXTrustStore.h"
-#endif
+#import "NXBootPolicy.h"
+#endif /* NX_ROM_BOOTLOADER */
+#import "NXROMFileHash.h"
 #import <Security/Security.h>
 #import <CommonCrypto/CommonDigest.h>
 #import <CommonCrypto/CommonHMAC.h>
 #include <sys/stat.h>
+#include <errno.h>
 #include <fcntl.h>
 #include <unistd.h>
 #include <libkern/OSByteOrder.h>
@@ -39,6 +42,8 @@
 extern bool CDHashOfFD(int fd, uint8_t out[20]) __attribute__((weak_import));
 
 static NSString *const NXROMSealName = @".nx-rom-seal.plist";
+static NSString *const NXROMFilesName = @"NXRomFiles.plist";
+static const char NXROMFilesDomain[] = "NXROM-FILES-v1";
 static const char NXROMArchiveDomain[] = "NXROM-ARCHIVE-v1";
 static const char NXROMSealDomain[] = "NXROM-BOOT-SEAL-v1";
 
@@ -96,7 +101,7 @@ static NSDictionary *NXROMTrustedKeyForProof(NSDictionary *proof)
     NSArray<NSDictionary *> *keys = NXTrustStoreTrustedKeys();
 #else
     NSArray<NSDictionary *> *keys = @[@{@"publicKey":[NSData dataWithBytes:NXROMPublicKey length:sizeof(NXROMPublicKey)]}];
-#endif
+#endif /* NX_ROM_BOOTLOADER */
     NSDictionary *attributes = @{(__bridge id)kSecAttrKeyType:(__bridge id)kSecAttrKeyTypeECSECPrimeRandom, (__bridge id)kSecAttrKeyClass:(__bridge id)kSecAttrKeyClassPublic, (__bridge id)kSecAttrKeySizeInBits:@256};
     for(NSDictionary *entry in keys)
     {
@@ -116,9 +121,53 @@ static NSDictionary *NXROMTrustedKeyForProof(NSDictionary *proof)
     return nil;
 }
 
+static BOOL NXROMTrustStoreOff(void)
+{
+#if NX_ROM_BOOTLOADER
+    return !NXBootPolicyTrustStoreValidation();
+#else
+    return NO;
+#endif /* NX_ROM_BOOTLOADER */
+}
+
 static BOOL NXROMVerifyProof(NSDictionary *proof)
 {
+    if(NXROMTrustedKeyForProof(proof) != nil)
+    {
+        return YES;
+    }
+    if(!NXROMTrustStoreOff() || ![proof isKindOfClass:NSDictionary.class])
+    {
+        return NO;
+    }
+    NSData *digest = proof[@"digest"];
+    id signature = proof[@"signature"];
+    return [digest isKindOfClass:NSData.class] && digest.length == CC_SHA256_DIGEST_LENGTH && (signature == nil || ([signature isKindOfClass:NSData.class] && [signature length] <= 72));
+}
+
+BOOL NXROMProofIsTrusted(NSDictionary *proof)
+{
     return NXROMTrustedKeyForProof(proof) != nil;
+}
+
+BOOL NXROMProofRequiresTicket(NSDictionary *proof)
+{
+#if NX_ROM_BOOTLOADER
+    if(!NXBootPolicyTSSValidation())
+    {
+        return NO;
+    }
+    
+    NSDictionary *signer = NXROMTrustedKeyForProof(proof);
+    if(signer == nil)
+    {
+        return !NXROMTrustStoreOff();
+    }
+    
+    return ![signer[@"tss"] isEqual:@NO];
+#else
+    return YES;
+#endif /* NX_ROM_BOOTLOADER */
 }
 
 NSDictionary *NXROMArchiveProofForFD(int fd,
@@ -134,19 +183,32 @@ NSDictionary *NXROMArchiveProofForFD(int fd,
     
     uint64_t length = OSSwapLittleToHostInt64(footer.length);
     uint32_t signatureLength = OSSwapLittleToHostInt32(footer.signatureLength);
+    NSString *footerProblem = nil;
     if(memcmp(footer.magic, "NXROM001", 8) != 0 || length != (uint64_t)before.st_size - sizeof(footer) || length < 22 || signatureLength < 8 || signatureLength > sizeof(footer.signature))
     {
-        NXROMFail(error, @"ROM release signature is missing or malformed.");
-        return nil;
+        footerProblem = @"ROM release signature is missing or malformed.";
+    }
+    else
+    {
+        for(size_t i = signatureLength; i < sizeof(footer.signature);i++)
+        {
+            if(footer.signature[i] != 0)
+            {
+                footerProblem = @"ROM signature padding is invalid.";
+                break;
+            }
+        }
     }
     
-    for(size_t i = signatureLength; i < sizeof(footer.signature);i++)
+    if(footerProblem != nil)
     {
-        if(footer.signature[i] != 0)
+        if(!NXROMTrustStoreOff())
         {
-            NXROMFail(error, @"ROM signature padding is invalid.");
+            NXROMFail(error, footerProblem);
             return nil;
         }
+        length = (uint64_t)before.st_size;
+        signatureLength = 0;
     }
     
     CC_SHA256_CTX hash;
@@ -480,10 +542,9 @@ NSDictionary *NXROMSealedReleaseIdentity(NSString *root,
         return nil;
     }
     
-    /* a release key with a roms list (TrustStore) may only sign those ROMs */
     NSDictionary *signer = NXROMTrustedKeyForProof(body[@"releaseProof"]);
     NSArray *roms = signer[@"roms"];
-    if(!signer || (roms && ![roms containsObject:manifest[@"NXRomIdentifier"]]))
+    if((!signer && !NXROMTrustStoreOff()) || (roms && ![roms containsObject:manifest[@"NXRomIdentifier"]]))
     {
         NXROMFail(error, [NSString stringWithFormat:@"%@ is not signed by a release key trusted for it.", manifest[@"NXRomIdentifier"]]);
         return nil;
@@ -538,6 +599,229 @@ BOOL NXROMVerifySealedFile(NSString *root,
     NSDictionary *actual = NXROMRecord([root stringByAppendingPathComponent:relative],error);
     NSDictionary *expected = body[@"inventory"][relative];
     return actual && [expected[@"type"] isEqual:@"file"] && [actual isEqual:expected];
+}
+
+static NSDictionary<NSString *, NSDictionary *> *NXROMNXT2Entitlements(NSDictionary *manifest)
+{
+    NSMutableDictionary *entitlements = [NSMutableDictionary dictionary];
+    id paths = manifest[@"NXRomPaths"];
+    if(![paths isKindOfClass:NSArray.class])
+    {
+        return entitlements;
+    }
+    for(NSDictionary *entry in paths)
+    {
+        if(![entry isKindOfClass:NSDictionary.class] || ![entry[@"NXRequiresCodeSigning"] isEqual:@YES]
+           || ![entry[@"NXT2Entitlements"] isKindOfClass:NSDictionary.class])
+        {
+            continue;
+        }
+        id path = entry[@"NXPath"];
+        for(id one in [path isKindOfClass:NSArray.class] ? path : (path ? @[path] : @[]))
+        {
+            if([one isKindOfClass:NSString.class])
+            {
+                entitlements[one] = entry[@"NXT2Entitlements"];
+            }
+        }
+    }
+    
+    return entitlements;
+}
+
+static BOOL NXROMFileListFail(NSError **error, NSString *format, ...) NS_FORMAT_FUNCTION(2,3);
+static BOOL NXROMFileListFail(NSError **error, NSString *format, ...)
+{
+    va_list arguments;
+    va_start(arguments, format);
+    NSString *message = [[NSString alloc] initWithFormat:format arguments:arguments];
+    va_end(arguments);
+    return NXROMFail(error, message);
+}
+
+BOOL NXROMVerifyFileList(NSString *root,
+                         NSDictionary *proof,
+                         BOOL checkNXT2,
+                         NSError **error)
+{
+    NSDictionary *signer = NXROMTrustedKeyForProof(proof);
+    if(signer == nil && !NXROMTrustStoreOff())
+    {
+        return NXROMFail(error, @"ROM has no release signature by a trusted key.");
+    }
+    
+    char canonical[PATH_MAX];
+    if(!realpath(root.fileSystemRepresentation, canonical))
+    {
+        return NXROMFail(error, @"Could not resolve ROM root.");
+    }
+    root = [NSString stringWithUTF8String:canonical];
+    
+    NSString *listPath = [root stringByAppendingPathComponent:NXROMFilesName];
+    struct stat st;
+    if(lstat(listPath.fileSystemRepresentation, &st) != 0 && errno == ENOENT && NXROMTrustStoreOff())
+    {
+        /* TrustStore validation off: a ROM without a list has nothing to be compared with (the seal still is) */
+        return YES;
+    }
+    if(lstat(listPath.fileSystemRepresentation, &st) != 0 || !S_ISREG(st.st_mode) || st.st_size <= 0 || st.st_size > 64 * 1024 * 1024)
+    {
+        return NXROMFail(error, @"This ROM has no signed file list.");
+    }
+    NSData *listData = [NSData dataWithContentsOfFile:listPath options:NSDataReadingUncached error:NULL];
+    id listing = listData ? [NSPropertyListSerialization propertyListWithData:listData options:NSPropertyListImmutable format:NULL error:NULL] : nil;
+    NSData *payload = [listing isKindOfClass:NSDictionary.class] ? listing[@"payload"] : nil;
+    NSData *signature = [listing isKindOfClass:NSDictionary.class] ? listing[@"signature"] : nil;
+    if(![listing isKindOfClass:NSDictionary.class] || ![listing[@"format"] isEqual:@1] || ![payload isKindOfClass:NSData.class]
+       || (signer != nil && (![signature isKindOfClass:NSData.class] || signature.length < 8 || signature.length > 72)))
+    {
+        return NXROMFail(error, @"The ROM's signed file list is malformed.");
+    }
+    
+    if(signer != nil)
+    {
+        unsigned char digest[CC_SHA256_DIGEST_LENGTH];
+        CC_SHA256_CTX hash;
+        CC_SHA256_Init(&hash);
+        CC_SHA256_Update(&hash, NXROMFilesDomain, sizeof(NXROMFilesDomain));
+        CC_SHA256_Update(&hash, payload.bytes, (CC_LONG)payload.length);
+        CC_SHA256_Final(digest, &hash);
+        NSDictionary *attributes = @{(__bridge id)kSecAttrKeyType:(__bridge id)kSecAttrKeyTypeECSECPrimeRandom, (__bridge id)kSecAttrKeyClass:(__bridge id)kSecAttrKeyClassPublic, (__bridge id)kSecAttrKeySizeInBits:@256};
+        SecKeyRef key = SecKeyCreateWithData((__bridge CFDataRef)signer[@"publicKey"], (__bridge CFDictionaryRef)attributes, NULL);
+        BOOL signedByDeveloper = key && SecKeyVerifySignature(key, kSecKeyAlgorithmECDSASignatureDigestX962SHA256, (__bridge CFDataRef)[NSData dataWithBytes:digest length:sizeof(digest)], (__bridge CFDataRef)signature, NULL);
+        if(key)
+        {
+            CFRelease(key);
+        }
+        if(!signedByDeveloper)
+        {
+            return NXROMFail(error, @"The ROM's file list isn't signed by the key that signed the release.");
+        }
+    }
+    NSDictionary *body = [NSPropertyListSerialization propertyListWithData:payload options:NSPropertyListImmutable format:NULL error:NULL];
+    NSDictionary *files = [body isKindOfClass:NSDictionary.class] ? body[@"files"] : nil;
+    if(![body isKindOfClass:NSDictionary.class] || ![body[@"format"] isEqual:@1] || ![files isKindOfClass:NSDictionary.class])
+    {
+        return NXROMFail(error, @"The ROM's signed file list is malformed.");
+    }
+    
+    NSData *manifestData = [NSData dataWithContentsOfFile:[root stringByAppendingPathComponent:@"manifest.plist"] options:NSDataReadingUncached error:NULL];
+    uint8_t manifestHash[32];
+    char reason[160] = "";
+    NSDictionary *manifestEntry = files[@"manifest.plist"];
+    if(!manifestData || ![manifestEntry isKindOfClass:NSDictionary.class] || !NXROMFileHash(manifestData.bytes, manifestData.length, "manifest.plist", manifestHash, reason, sizeof(reason))
+       || ![manifestEntry[@"type"] isEqual:@"file"]
+       || ![manifestEntry[@"hash"] isEqual:[NSData dataWithBytes:manifestHash length:sizeof(manifestHash)]])
+    {
+        return NXROMFail(error, @"The ROM's manifest isn't the one its developer signed.");
+    }
+    
+    NSDictionary *manifest = [NSPropertyListSerialization propertyListWithData:manifestData options:NSPropertyListImmutable format:NULL error:NULL];
+    if(![manifest isKindOfClass:NSDictionary.class] || ![body[@"identifier"] isEqual:manifest[@"NXRomIdentifier"]]
+       || ![body[@"version"] isEqual:manifest[@"NXRomVersion"]] || ![body[@"securityVersion"] isEqual:manifest[@"NXRomSecurityVersion"]])
+    {
+        return NXROMFail(error, @"The ROM's signed file list is for another release.");
+    }
+    
+    NSArray *roms = signer[@"roms"];
+    if(roms && ![roms containsObject:manifest[@"NXRomIdentifier"]])
+    {
+        return NXROMFileListFail(error, @"%@ is not signed by a release key trusted for it.", manifest[@"NXRomIdentifier"]);
+    }
+    
+    NSDictionary *entitlements = checkNXT2 ? NXROMNXT2Entitlements(manifest) : nil;
+    
+    __block BOOL failed = NO;
+    NSDirectoryEnumerator *enumerator = [NSFileManager.defaultManager enumeratorAtURL:[NSURL fileURLWithPath:root isDirectory:YES]
+        includingPropertiesForKeys:nil options:0 errorHandler:^BOOL(NSURL *url, NSError *failure){
+        failed = YES;
+        return NO;
+    }];
+    if(!enumerator)
+    {
+        return NXROMFail(error, @"Could not enumerate ROM files.");
+    }
+    NSString *prefix = [root stringByAppendingString:@"/"];
+    NSUInteger seen = 0;
+    for(NSURL *entry in enumerator)
+    {
+        if(![entry.path hasPrefix:prefix])
+        {
+            return NXROMFail(error, @"ROM path outside root.");
+        }
+        NSString *relative = [entry.path substringFromIndex:prefix.length];
+        if([relative isEqual:NXROMSealName] || [relative isEqual:NXROMFilesName])
+        {
+            continue;
+        }
+        NSDictionary *expected = files[relative];
+        if(![expected isKindOfClass:NSDictionary.class])
+        {
+            return NXROMFileListFail(error, @"This ROM has %@, which its developer didn't sign.", relative);
+        }
+        seen++;
+        if(lstat(entry.path.fileSystemRepresentation, &st) != 0)
+        {
+            return NXROMFail(error, @"ROM entry is missing.");
+        }
+        if(S_ISDIR(st.st_mode))
+        {
+            if(![expected[@"type"] isEqual:@"directory"])
+            {
+                return NXROMFileListFail(error, @"%@ isn't what its developer signed.", relative);
+            }
+            continue;
+        }
+        if(S_ISLNK(st.st_mode))
+        {
+            [enumerator skipDescendants];
+            NSString *target = [NSFileManager.defaultManager destinationOfSymbolicLinkAtPath:entry.path error:NULL];
+            if(![expected[@"type"] isEqual:@"symlink"] || ![expected[@"target"] isEqual:target])
+            {
+                return NXROMFileListFail(error, @"%@ isn't what its developer signed.", relative);
+            }
+            continue;
+        }
+        if(!S_ISREG(st.st_mode) || ![expected[@"type"] isEqual:@"file"])
+        {
+            return NXROMFileListFail(error, @"%@ isn't what its developer signed.", relative);
+        }
+        NSData *data = [NSData dataWithContentsOfFile:entry.path options:NSDataReadingMappedIfSafe error:NULL];
+        uint8_t fileHash[32];
+        if(!data || !NXROMFileHash(data.bytes, data.length, relative.lastPathComponent.fileSystemRepresentation, fileHash, reason, sizeof(reason)))
+        {
+            return NXROMFileListFail(error, @"%@ can't be checked: %s.", relative, reason);
+        }
+        if(![expected[@"hash"] isEqual:[NSData dataWithBytes:fileHash length:sizeof(fileHash)]])
+        {
+            return NXROMFileListFail(error, @"%@ was changed after its developer signed it.", relative);
+        }
+        if(checkNXT2 && NXROMFileKindOf(data.bytes, data.length) == NXROMFileKindMachO)
+        {
+            const uint8_t *plist = NULL;
+            size_t plistLength = 0;
+            if(!NXROMFileNXT2Plist(data.bytes, data.length, &plist, &plistLength))
+            {
+                return NXROMFileListFail(error, @"%@ has a malformed entitlements blob.", relative);
+            }
+            NSDictionary *wanted = entitlements[relative];
+            id present = plist ? [NSPropertyListSerialization propertyListWithData:[NSData dataWithBytes:plist length:plistLength] options:NSPropertyListImmutable format:NULL error:NULL] : nil;
+            if(wanted ? ![present isEqual:wanted] : plist != NULL)
+            {
+                return NXROMFileListFail(error, @"%@ has entitlements its developer didn't give it.", relative);
+            }
+        }
+    }
+    if(failed)
+    {
+        return NXROMFail(error, @"ROM enumeration failed.");
+    }
+    if(seen != files.count)
+    {
+        return NXROMFail(error, @"Files its developer signed are missing from this ROM.");
+    }
+    
+    return YES;
 }
 
 #if NX_ROM_BOOTLOADER
