@@ -3,21 +3,26 @@
   <p><i>A full native IDE and a userspace microkernel for building and running iOS apps entirely on-device. offline, unjailbroken, iOS 18.0 all the way through iOS 27.2 Beta 2</i></p>
 </div>
 <h6 align="center">
-  <a target="_blank" href="https://discord.gg/H96bhkAHjB"><img src="https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fdiscord.com%2Fapi%2Fv9%2Finvites%2FH96bhkAHjB&amp;query=profile.member_count&amp;suffix=%20Members&amp;style=for-the-badge&amp;logo=discord&amp;logoColor=fff&amp;label=emexLabs%20Discord&amp;labelColor=000&amp;color=fff" alt="Discord invite"></a>
-  <a href="https://github.com/emexlab/emexDE/actions/workflows/build.yml"><img src="https://img.shields.io/github/actions/workflow/status/emexlab/emexDE/build.yml?style=for-the-badge&amp;logo=github&amp;label=Build%20iOS%20App&amp;labelColor=000&amp;color=fff" alt="Build iOS App"></a>
+  <a target="_blank" href="https://discord.gg/H96bhkAHjB"><img src="https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fdiscord.com%2Fapi%2Fv9%2Finvites%2FH96bhkAHjB&amp;query=profile.member_count&amp;logo=discord&amp;label=Discord&amp;color=7289DA" /></a>
+  <a href="https://github.com/emexlab/emexDE/actions/workflows/build.yml"><img src="https://img.shields.io/github/actions/workflow/status/emexlab/emexDE/build.yml?style=for-the-badge&amp;logo=github" /></a>
 </h6>
 <p align="center">
   <img src="./mockup.png">
 </p>
 
 ## What is it?
-Nyxian is an iOS app that empowers developers with a full toolchain they can use while even being offline for iOS development on iPhone. It supports Swift, C, Objective-C, C++ and Objective-C++. It’s a powerful IDE that made the impossible possible, a fully on-device iOS IDE that doesn’t even need a cloud and can even be used with airplane mode enabled after it downloaded the SDK and resources from our server. It supports officially iOS 18.0 all the way up to the latest iOS version (iOS/iPadOS 27.2 Beta 2 tested). You can compile and run iOS apps on the go with ease, using the entire iOS 26.5 SDK.
+Nyxian is an iOS app that empowers developers with a full toolchain they can use while even being offline for iOS development on iPhone. It supports Swift, C, Objective-C, C++ and Objective-C++. It provides a native on-device build environment, a userspace microkernel, and the tooling to compile, run, and manage app packages without needing a desktop or a jailbroken device.
+
+## Core focus: ProcEnvironment/Surface
+Everything I care about is located at `Nyxian/LindChain/ProcEnvironment/Surface`.
+
+This is the core process-environment and runtime surface of Nyxian: the low-level layer where the microkernel, process abstraction, filesystem and tty plumbing, trust/key handling, memory mapping, and syscall-facing behavior are assembled. In practical terms, it is the foundation that connects Nyxian's userspace environment to the host iOS runtime and exposes the machinery needed for native app execution, process isolation, and system-like services.
 
 ## Installation
 To start using Nyxian view the [Installation Guide](https://emexlabs.org/Nyxian/docs/installation/).
 
 ## Limitations
-The only current limitation is that we cannot intercept a arm64 supervisor call, but that is not so much of a problem, because remember we are on iOS, processes have nearly no priveleges, so by bypassing our shims and asking the iOS kernel directly wouldn't grant anything useful to the attacker, there may be tho a way to intercept a arm64 supervisor call, we think constantly in all directions. If there may be a register apple did not account for or a condition in which a arm64 supervisor call causes a debug exception. So we are already very focused on finding a possible soulution as that would also take weight from the guest process and make it's initialization speed faster, for the speed we have a other solution tho, a extension process poll where extensions wait on mach msg traps till they get the request, meaning they are entirely setup and ready to serve shrinking the initilization speed to effectively zero.
+The only current limitation is that we cannot intercept a arm64 supervisor call, but that is not so much of a problem, because remember we are on iOS, processes have nearly no priveleges, so by by not intercepting a supervisor call we can still do most things we need to do.
 
 ## Todo
 - IDE
@@ -42,7 +47,7 @@ The only current limitation is that we cannot intercept a arm64 supervisor call,
     - [x] object API
     - [x] process object
     - [x] privelege model
-    - [x] custom entitlement blob (translated from AppleCS to NXT2 aswell!)
+    - [x] custom entitlement blob (translated from AppleCS to NXT2 as well!)
     - Kext Link Editor (kxld)
       - [x] validate code signature of kext
       - [x] validate it's nyxian trust blob
@@ -57,7 +62,7 @@ The only current limitation is that we cannot intercept a arm64 supervisor call,
       - [x] act upon `kmod_info_t`
     - Syscall handling
       - [x] Mach IPC syscall server
-      - [x] Task port handoff (usually they are guarded we bypass that by moving a receive right after the send right has been set as exception port to the host and then executing a `brk` instruction which then causes the host to get a `IKOT_TASK` mach port reference which is a control task port which can be reference retained and boom we got our redistributable unguarded task port)
+      - [x] Task port handoff (usually they are guarded we bypass that by moving a receive right after the send right has been set as exception port to the host and then executing a `brk` instruction to move the task to a new address space that respects our init and their rest of data)
       - [x] Memory copy in/out of guests (yep out of the iOS processes and into them without assistance, this is not a typo lol)
     - Subprocess Patches
       - [x] `posix_spawn`/`posix_spawnp` fix
