@@ -3,7 +3,7 @@
   <p><i>A full native IDE and a userspace microkernel for building and running iOS apps entirely on-device. offline, unjailbroken, iOS 18.0 all the way through iOS 27.2 Beta 2</i></p>
 </div>
 <h6 align="center">
-  <a target="_blank" href="https://discord.gg/H96bhkAHjB"><img src="https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fdiscord.com%2Fapi%2Fv9%2Finvites%2FH96bhkAHjB&amp;query=profile.member_count&amp;logo=discord&amp;label=Discord&amp;color=7289DA" /></a>
+  <a href="https://fluxer.gg/PLQlvDkC"><img src="https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Ffluxer.com%2Fapi%2Fv1%2Finvites%2FPLQlvDkC&query=member_count&suffix=%20members&style=for-the-badge&logo=fluxer&label=Fluxer&color=%234641D9" alt="Fluxer invite"></a>
   <a href="https://github.com/emexlab/emexDE/actions/workflows/build.yml"><img src="https://img.shields.io/github/actions/workflow/status/emexlab/emexDE/build.yml?style=for-the-badge&amp;logo=github" /></a>
 </h6>
 <p align="center">
