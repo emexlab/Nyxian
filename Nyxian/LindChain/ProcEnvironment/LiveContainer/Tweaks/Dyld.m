@@ -223,8 +223,8 @@ just_try:
     void *nxdiag_handle = LIBKERN_ORIG(dlopen_hook)(dyldApiInstancePtr, __path, __mode);
     if(nxdiag_handle == NULL)
     {
-        const char *err = dlerror();
-        fprintf(stderr, "[nxdiag:dlopen] pid %d: FAILED %s: %s\n", getpid(), __path ? __path : "(null)", err ? err : "?");
+        /* do not call dlerror() here: it would clear the error the caller reads */
+        fprintf(stderr, "[nxdiag:dlopen] pid %d: FAILED %s\n", getpid(), __path ? __path : "(null)");
     }
     else
     {
