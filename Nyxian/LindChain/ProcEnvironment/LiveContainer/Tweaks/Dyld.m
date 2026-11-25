@@ -197,20 +197,40 @@ LIBKERN_PATCH(void *, dlopen_hook, (void* dyldApiInstancePtr,
     
     bool cs_valid = LCCheckCodeSignature(machO);
     LCUnmapMachO(machO);
+    fprintf(stderr, "[nxdiag:dlopen] pid %d: %s cs_valid=%d\n", getpid(), __path, cs_valid);
     if(!cs_valid)
     {
         /* sign if invalid */
         int fd = open(__path, O_RDWR);
         if(fd >= 0)
         {
-            liveshim_syscall(SYS_sign, fd);
+            long signret = (long)liveshim_syscall(SYS_sign, fd);
             close(fd);
+            fprintf(stderr, "[nxdiag:dlopen] pid %d: SYS_sign -> %ld (%s)\n", getpid(), signret, __path);
+        }
+        else
+        {
+            fprintf(stderr, "[nxdiag:dlopen] pid %d: open O_RDWR failed errno=%d (%s)\n", getpid(), errno, __path);
         }
     }
     
 just_try:
+    if(machO == nil)
+    {
+        fprintf(stderr, "[nxdiag:dlopen] pid %d: %s (not mapped as MachO)\n", getpid(), __path ? __path : "(null)");
+    }
     /* continue with opening */
-    return LIBKERN_ORIG(dlopen_hook)(dyldApiInstancePtr, __path, __mode);
+    void *nxdiag_handle = LIBKERN_ORIG(dlopen_hook)(dyldApiInstancePtr, __path, __mode);
+    if(nxdiag_handle == NULL)
+    {
+        const char *err = dlerror();
+        fprintf(stderr, "[nxdiag:dlopen] pid %d: FAILED %s: %s\n", getpid(), __path ? __path : "(null)", err ? err : "?");
+    }
+    else
+    {
+        fprintf(stderr, "[nxdiag:dlopen] pid %d: ok %s\n", getpid(), __path ? __path : "(null)");
+    }
+    return nxdiag_handle;
 });
 
 bool hook_dyld_program_sdk_at_least(void* dyldApiInstancePtr,

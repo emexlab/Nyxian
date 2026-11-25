@@ -39,7 +39,7 @@ static void init_process_start_time(void)
 }
 
 /* maximum lines klog can take */
-static const NSUInteger KLOG_MAX_LINES = 500;
+static const NSUInteger KLOG_MAX_LINES = 20000;
 
 static void klog_truncate_if_needed(void)
 {
@@ -57,6 +57,12 @@ static void klog_truncate_if_needed(void)
     
     /* checking validity of that file size */
     if(size <= 0)
+    {
+        return;
+    }
+    
+    /* diag: only bother rewriting once the log is large (reading it on every line is slow) */
+    if(size < 6 * 1024 * 1024)
     {
         return;
     }
@@ -541,6 +547,24 @@ void klog_log_internal(const char *system, const char *format, ...)
                 perror("rename");
             }
             
+            /* diag: keep previous boot logs in Documents/NyxianLogs (last 10) */
+            {
+                NSFileManager *fm = [NSFileManager defaultManager];
+                NSString *dir = [NSString stringWithFormat:@"%@/Documents/NyxianLogs", NSHomeDirectory()];
+                [fm createDirectoryAtPath:dir withIntermediateDirectories:YES attributes:nil error:nil];
+                NSDateFormatter *df = [NSDateFormatter new];
+                df.dateFormat = @"yyyy-MM-dd_HH-mm-ss";
+                NSString *stamp = [df stringFromDate:[NSDate date]];
+                if([fm fileExistsAtPath:entry_path])
+                {
+                    [fm copyItemAtPath:entry_path toPath:[dir stringByAppendingFormat:@"/kmsg-before-%@.txt", stamp] error:nil];
+                }
+                NSArray *files = [[[fm contentsOfDirectoryAtPath:dir error:nil] filteredArrayUsingPredicate:[NSPredicate predicateWithFormat:@"SELF BEGINSWITH 'kmsg-'"]] sortedArrayUsingSelector:@selector(compare:)];
+                for(NSUInteger i = 0; files.count > 10 && i < files.count - 10; i++)
+                {
+                    [fm removeItemAtPath:[dir stringByAppendingPathComponent:files[i]] error:nil];
+                }
+            }
             kfd = open([entry_path UTF8String], O_RDWR | O_CREAT | O_TRUNC, 0644);
             if(kfd == -1)
             {

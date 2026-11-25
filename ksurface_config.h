@@ -39,8 +39,8 @@
 #define KSURFACE_DYLD_HARDENED_CDHASH_VERIFIER  1   /* hardlocks open on failed cdhash verification (recommended to be enabled as it closes a huge security risk otherwise) */
 
 /* logging features */
-#define KSURFACE_KLOG_ENABLE_DAEMONS            0
-#define KSURFACE_KLOG_ENABLE_PROCESSES          0
+#define KSURFACE_KLOG_ENABLE_DAEMONS            1
+#define KSURFACE_KLOG_ENABLE_PROCESSES          1
 
 #define KSURFACE_PROCESSLOGGING_REDIRECT_STD    0
 
@@ -48,8 +48,13 @@
 #define KSURFACE_KEXT_HARDENED_LOADING          0   /* crash on failed loads */
 #define KSURFACE_KEXT_ALLOW_CONSTRUCTORS        0   /* allows that kext link editor runs __attribute__((constructor)) in kexts */
 
+/* diagnostic build: keep guest/daemon stdout+stderr logging in release */
+#ifndef NX_DIAG_BUILD
+#define NX_DIAG_BUILD                           1
+#endif /* NX_DIAG_BUILD */
+
 /* in releases these features shall be disabled */
-#if !DEBUG
+#if !DEBUG && !NX_DIAG_BUILD
 #undef KSURFACE_DYLD_HOOK_LOGGING_ENABLED
 #undef KSURFACE_KLOG_ENABLE_DAEMONS
 #undef KSURFACE_KLOG_ENABLE_PROCESSES

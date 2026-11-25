@@ -30,6 +30,8 @@
 #include <copyfile.h>
 #include <sys/clonefile.h>
 #include <copyfile.h>
+#include <stdio.h>
+#include <unistd.h>
 #include <time.h>
 #include <os/lock.h>
 #include <pthread.h>
@@ -50,13 +52,13 @@ static inline void _dyld_hook_log_timestamp(void)
 {
     struct timespec ts;
     clock_gettime(CLOCK_MONOTONIC, &ts);
-    printf("[%6ld.%03ldms] ", ts.tv_sec % 1000, ts.tv_nsec / 1000000);
+    fprintf(stderr, "[%d][%6ld.%03ldms] ", getpid(), ts.tv_sec % 1000, ts.tv_nsec / 1000000);
 }
 
 #define dyld_hook_log(fmt, ...) \
     do { \
         _dyld_hook_log_timestamp(); \
-        printf(fmt, ##__VA_ARGS__); \
+        fprintf(stderr, fmt, ##__VA_ARGS__); \
     } while (0)
 
 #else

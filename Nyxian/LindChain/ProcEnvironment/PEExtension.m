@@ -133,7 +133,7 @@ LIBKERN_DEFINE_PATCHABLE(FBProcess*, PESpawnFBProcess, (NSDictionary *items,
     }
     mutableItems[@"PEEnvironment"] = env;
     
-#if DEBUG && KSURFACE_KLOG_ENABLE_PROCESSES
+#if (DEBUG || NX_DIAG_BUILD) && KSURFACE_KLOG_ENABLE_PROCESSES
     if(![mutableItems valueForKey:@"PEFileTable"])
     {
         extern int kfd;

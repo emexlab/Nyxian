@@ -125,7 +125,7 @@
     }
     mutable[@"PEEnvironment"] = env;
     
-#if DEBUG && KSURFACE_KLOG_ENABLE_DAEMONS
+#if (DEBUG || NX_DIAG_BUILD) && KSURFACE_KLOG_ENABLE_DAEMONS
     extern int kfd;
     PEFileTable *fileTable = [PEFileTable emptyTable];
 #if KSURFACE_PROCESSLOGGING_REDIRECT_STD

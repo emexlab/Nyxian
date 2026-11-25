@@ -2108,6 +2108,47 @@ private func recoveryShowReboot(recoveryController c: NXRecoveryViewController) 
     c.enterRecovery(withHeader: "Reboot", instructions: "Current Slot: \(activeSlotName())", footer: nil, items: items, onSelect: nil, onMove: nil)
 }
 
+/* diag: collect every log Nyxian keeps and hand them to the share sheet */
+private func recoveryShareLogs(_ c: NXRecoveryViewController) {
+    let fm = FileManager.default
+    let docs = URL(fileURLWithPath: NSHomeDirectory()).appendingPathComponent("Documents")
+    var urls: [URL] = []
+    for name in ["kmsg.txt", "kmsg_old.txt"] {
+        let u = docs.appendingPathComponent(name)
+        if fm.fileExists(atPath: u.path) { urls.append(u) }
+    }
+    let logDir = docs.appendingPathComponent("NyxianLogs")
+    if let files = try? fm.contentsOfDirectory(at: logDir, includingPropertiesForKeys: nil) {
+        urls.append(contentsOf: files.sorted { $0.lastPathComponent > $1.lastPathComponent }.prefix(5))
+    }
+    // small device / build summary first
+    let info = Bundle.main.infoDictionary ?? [:]
+    var summary = "Nyxian diag report\n"
+    summary += "version: \(info["CFBundleShortVersionString"] ?? "?") (\(info["CFBundleVersion"] ?? "?"))\n"
+    summary += "iOS: \(UIDevice.current.systemVersion)\n"
+    var sysinfo = utsname(); uname(&sysinfo)
+    let machine = withUnsafeBytes(of: &sysinfo.machine) { String(decoding: $0.prefix(while: { $0 != 0 }), as: UTF8.self) }
+    summary += "device: \(machine)\n"
+    summary += "active slot: \(activeSlotName())\n"
+    summary += "slot A: \(slotSummary("A"))\nslot B: \(slotSummary("B"))\n"
+    summary += "boot args: \(BootArguments.string)\n"
+    summary += "TrustStore: \(trustStoreSummary())\n"
+    let summaryURL = logDir.appendingPathComponent("summary.txt")
+    try? fm.createDirectory(at: logDir, withIntermediateDirectories: true)
+    try? summary.write(to: summaryURL, atomically: true, encoding: .utf8)
+    urls.insert(summaryURL, at: 0)
+    guard !urls.isEmpty else {
+        c.recoveryLogError("No logs found")
+        return
+    }
+    let sheet = UIActivityViewController(activityItems: urls, applicationActivities: nil)
+    if let pop = sheet.popoverPresentationController {
+        pop.sourceView = c.view
+        pop.sourceRect = CGRect(x: c.view.bounds.midX, y: c.view.bounds.midY, width: 1, height: 1)
+    }
+    c.present(sheet, animated: true)
+}
+
 func recoveryShowMenu(recoveryController: NXRecoveryViewController) {
     let header = "Nyxian Recovery"
     func page(_ title: String, items: [NXRecoveryItem]) -> NXRecoveryItem {
@@ -2145,6 +2186,9 @@ func recoveryShowMenu(recoveryController: NXRecoveryViewController) {
     }
     let wipe: NXRecoveryItem = NXRecoveryItem(title: "Wipe") { controller in if let controller { recoveryShowWipe(controller) } }
     let advanced: [NXRecoveryItem] = [
+        NXRecoveryItem(title: "Share Logs") { c in
+            if let c { recoveryShareLogs(c) }
+        },
         NXRecoveryItem(title: "Flash ROM") { c in
             guard let c, !romIsBusy(c) else { return }
             romImporter.present(from: c) { url in
